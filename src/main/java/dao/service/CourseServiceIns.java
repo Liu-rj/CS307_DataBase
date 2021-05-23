@@ -19,7 +19,7 @@ import java.util.*;
 import java.sql.*;
 
 
-public class CourseServiceIns implements CourseService {
+    public class CourseServiceIns implements CourseService {
     public static void parsePre(Queue<List<Prerequisite>> presQueue, Set<List<Prerequisite>> resultSet) {
         List<Prerequisite> listTemp;
         Prerequisite preTemp = null;
@@ -152,12 +152,17 @@ public class CourseServiceIns implements CourseService {
 
     @Override
     public void removeCourse(String courseId) {
+        //courseId represents the id of course. For example, CS307, CS309
         String sql = "delete from Course where Course.id = ?";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            //execute the removeCourse operation
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setString(1, courseId);
             preparedStatement.execute();
+
+           // close connection
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
@@ -168,9 +173,13 @@ public class CourseServiceIns implements CourseService {
 
     @Override
     public void removeCourseSection(int sectionId) {
+        //TODO:sectionId 具体指什么，从这里看sectionid是一个主键，但是courseSectionid文件的描述为"  /**
+        //     *For example it can represent the id of section "No.1 Chinese class of database principle"
+        //     */"
         String sql = "delete from CourseSection where CourseSection.id = ?";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setInt(1, sectionId);
             preparedStatement.execute();
@@ -183,6 +192,19 @@ public class CourseServiceIns implements CourseService {
 
     @Override
     public void removeCourseSectionClass(int classId) {
+        //TODO:现在还不知道这个classId表示的是什么，暂时将它当成CourseSectionClass的primaryKey
+        String sql = "delete from CourseSectionClass where CourseSectionClass.id = ?";
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setInt(1, classId);
+            preparedStatement.execute();
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
     }
 
