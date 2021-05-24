@@ -58,7 +58,7 @@ public class DepartmentServiceIns implements DepartmentService{
 
     @Override
     public List<Department> getAllDepartments() {
-        String sql = "select * from department where departmentId = ?;";
+        String sql = "select * from department;"; //TODO：需不需要按顺序选择（order by）
         //这个方法是将所有院系的名称(String 类型)放到一个list里面
         List<Department> departmentList = new ArrayList<>();
         //先把所有的数据选出来，然后再一条一条放到list里面去
@@ -83,6 +83,7 @@ public class DepartmentServiceIns implements DepartmentService{
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        //TODO：这里默认的return值需不需要进行修改？
         return null;
     }
 
