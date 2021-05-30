@@ -6,6 +6,7 @@ import cn.edu.sustech.cs307.dto.prerequisite.CoursePrerequisite;
 import cn.edu.sustech.cs307.dto.prerequisite.Prerequisite;
 import cn.edu.sustech.cs307.exception.IntegrityViolationException;
 import cn.edu.sustech.cs307.service.*;
+import dao.factory.ServiceFactoryIns;
 
 import javax.annotation.Nullable;
 import java.sql.*;
@@ -83,8 +84,8 @@ public class StudentServiceIns implements StudentService{
     public Major getStudentMajor(int studentId) {
         String getMajor = "select *\n" +
                 "from student s\n" +
-                "         join major m on s.majorId = m.majorId\n" +
-                "where s.userId = ?;";
+                "         join major m on s.major_id = m.major_id\n" +
+                "where s.major_id = ?;";
         PreparedStatement preparedStatement;
         ResultSet resultSet;
         Major major = new Major();
@@ -95,10 +96,10 @@ public class StudentServiceIns implements StudentService{
             preparedStatement = connection.prepareStatement(getMajor);
             preparedStatement.setInt(1, studentId);
             resultSet = preparedStatement.executeQuery();
-            major.id = resultSet.getInt("s.majorid");
+            major.id = resultSet.getInt("s.major_id");
             major.name = resultSet.getString("name");
             DepartmentServiceIns departmentServiceIns = new DepartmentServiceIns();
-            major.department = departmentServiceIns.getDepartment(resultSet.getInt("departmentid"));
+            major.department = departmentServiceIns.getDepartment(resultSet.getInt("department_id"));
 
             // close connection
             connection.close();
