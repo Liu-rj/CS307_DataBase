@@ -79,7 +79,8 @@ public class CourseServiceIns implements CourseService {
                 for (List<Prerequisite> l : resultSet) {
                     for (Prerequisite p : l) {
                         // query id_serial corresponding to courseId
-                        preparedStatement = connection.prepareStatement("select id_serial from course where id = " + ((CoursePrerequisite) p).courseID + ";");
+                        preparedStatement = connection.prepareStatement("select course_id from course where id = ?;");
+                        preparedStatement.setString(1, ((CoursePrerequisite) p).courseID);
                         preparedStatement.execute();
                         id_serial = preparedStatement.getResultSet().getInt(1);
 
@@ -109,7 +110,8 @@ public class CourseServiceIns implements CourseService {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // query id_serial according to courseId
-            preparedStatement = connection.prepareStatement("select id_serial from course where id = " + courseId + ";");
+            preparedStatement = connection.prepareStatement("select course_id from course where id = ?;");
+            preparedStatement.setString(1, courseId);
             preparedStatement.execute();
             int cid = preparedStatement.getResultSet().getInt(1);
 
@@ -122,7 +124,7 @@ public class CourseServiceIns implements CourseService {
             preparedStatement.execute();
 
             // return val for this interface
-            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('coursesection', 'id_serial'));");
+            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('section', 'section_id'));");
             preparedStatement.execute();
             int curId = preparedStatement.getResultSet().getInt(1);
 
@@ -131,7 +133,6 @@ public class CourseServiceIns implements CourseService {
             preparedStatement.setInt(1, curId);
             preparedStatement.setInt(2, semesterId);
             preparedStatement.execute();
-
 
 
             // close connection
@@ -152,7 +153,8 @@ public class CourseServiceIns implements CourseService {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // query id_serial according to given location name
-            preparedStatement = connection.prepareStatement("select id_serial from location where name = " + location + ";");
+            preparedStatement = connection.prepareStatement("select location_id from location where name = ?;");
+            preparedStatement.setString(1, location);
             preparedStatement.execute();
             int lid = preparedStatement.getResultSet().getInt(1);
 
@@ -167,7 +169,7 @@ public class CourseServiceIns implements CourseService {
             preparedStatement.execute();
 
             // return val for this interface
-            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('coursesection', 'id_serial'));");
+            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('class', 'class_id'));");
             preparedStatement.execute();
             int curId = preparedStatement.getResultSet().getInt(1);
 
@@ -191,7 +193,7 @@ public class CourseServiceIns implements CourseService {
     @Override
     public void removeCourse(String courseId) {
         //courseId represents the id of course. For example, CS307, CS309
-        String delCourse = "delete from Course where Course.id = ?;";
+        String delCourse = "delete from course where id = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -206,13 +208,12 @@ public class CourseServiceIns implements CourseService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
     }
 
     @Override
     public void removeCourseSection(int sectionId) {
         // sectionId: id_serial in table section
-        String delSection = "delete from section where id_serial = ?;";
+        String delSection = "delete from section where section_id = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -232,7 +233,7 @@ public class CourseServiceIns implements CourseService {
     @Override
     public void removeCourseSectionClass(int classId) {
         // classId: id_serial in table class
-        String sql = "delete from class where id_serial = ?;";
+        String sql = "delete from class where class_id = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -251,36 +252,27 @@ public class CourseServiceIns implements CourseService {
 
     @Override
     public List<CourseSection> getCourseSectionsInSemester(String courseId, int semesterId) {
-        String sel = "select a.section_id, a.name, a.totalCapacity, a.leftCapacity\n" +
-                "from (\n" +
-                "         select *\n" +
-                "         from section_semester ss\n" +
-                "                  join section s on ss.section_id = s.id_serial\n" +
-                "     ) a\n" +
-                "where a.semester_id = ?\n" +
-                "  and a.courseId = ?;";
-        String selCourseId = "select id_serial from course where id = ?;";
+        String sel = "select *\n" +
+                "from section_semester ss\n" +
+                "         join section s on s.section_id = ss.section_id\n" +
+                "         join course c on c.course_id = s.course_id\n" +
+                "where s.section_id = ?\n" +
+                "  and c.id = ?;";
         List<CourseSection> sections = new ArrayList<>();
         PreparedStatement preparedStatement;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-            // execute selCourseId to get id_serial for courseId
-            preparedStatement = connection.prepareStatement(selCourseId);
-            preparedStatement.setString(1, courseId);
-            preparedStatement.execute();
-            int cid_serial = preparedStatement.getResultSet().getInt(1);
-
             // execute sel to get target sections
             preparedStatement = connection.prepareStatement(sel);
             preparedStatement.setInt(1, semesterId);
-            preparedStatement.setInt(2, cid_serial);
+            preparedStatement.setString(2, courseId);
             ResultSet resultSet = preparedStatement.executeQuery();
             while (resultSet.next()) {
-                int id = resultSet.getInt(1);
-                String name = resultSet.getString(2);
-                int total = resultSet.getInt(3);
-                int left = resultSet.getInt(4);
+                int id = resultSet.getInt("s.section_id");
+                String name = resultSet.getString("s.name");
+                int total = resultSet.getInt("total_capacity");
+                int left = resultSet.getInt("left_capacity");
 
                 CourseSection section = new CourseSection();
                 section.id = id;
@@ -303,8 +295,8 @@ public class CourseServiceIns implements CourseService {
     @Override
     public Course getCourseBySection(int sectionId) {
         Course course = new Course();
-        String selCourse = "select courseId from section where id_serial = ?;";
-        String courseInfo = "select * from course where id_serial = ?;";
+        String selCourse = "select course_id from section where section_id = ?;";
+        String courseInfo = "select * from course where course_id = ?;";
         ResultSet resultSet;
         PreparedStatement preparedStatement;
         try {
@@ -323,8 +315,8 @@ public class CourseServiceIns implements CourseService {
             course.id = resultSet.getString("id");
             course.name = resultSet.getString("name");
             course.credit = resultSet.getInt("credit");
-            course.classHour = resultSet.getInt("classHour");
-            course.grading = Course.CourseGrading.values()[resultSet.getInt("grading")];
+            course.classHour = resultSet.getInt("class_hour");
+            course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
 
             // close connection
             connection.close();
@@ -339,12 +331,12 @@ public class CourseServiceIns implements CourseService {
     public List<CourseSectionClass> getCourseSectionClasses(int sectionId) {
         String selClass = "select *\n" +
                 "from class c\n" +
-                "         join instructor i on c.instructor = i.userId\n" +
-                "         join location l on c.location = l.id_serial\n" +
-                "where c.sectionId = ?;";
-        String selWeek = "select week from week_class where classId = ?;";
+                "         join instructor i on c.instructor_id = i.ins_id\n" +
+                "         join location l on c.location_id = l.location_id\n" +
+                "where c.section_id = ?;";
+        String selWeek = "select week from week_class where class_id = ?;";
         ResultSet resultSet, rsTemp;
-        PreparedStatement preparedStatement;
+        PreparedStatement preparedStatement, preTemp;
         List<CourseSectionClass> classes = new ArrayList<>();
         List<Short> wkList;
         try {
@@ -356,17 +348,19 @@ public class CourseServiceIns implements CourseService {
             resultSet = preparedStatement.executeQuery();
             while (resultSet.next()) {
                 CourseSectionClass csc = new CourseSectionClass();
-                csc.id = resultSet.getInt("c.id_serial");
+                csc.id = resultSet.getInt("class_id");
                 csc.instructor = new Instructor();
-                csc.instructor.id = resultSet.getInt("instructor");
-                csc.instructor.fullName = resultSet.getString("fullname");
-                csc.dayOfWeek = DayOfWeek.of(resultSet.getInt("dayofweek"));
-                csc.classBegin = (short) resultSet.getInt("classBegin");
-                csc.classEnd = (short) resultSet.getInt("classEnd");
+                csc.instructor.id = resultSet.getInt("instructor_id");
+                csc.instructor.fullName = resultSet.getString("full_name");
+                csc.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
+                csc.classBegin = (short) resultSet.getInt("class_begin");
+                csc.classEnd = (short) resultSet.getInt("class_end");
                 csc.location = resultSet.getString("name");
-                preparedStatement = connection.prepareStatement(selWeek);
-                preparedStatement.setInt(1, csc.id);
-                rsTemp = preparedStatement.executeQuery();
+
+                // get week
+                preTemp = connection.prepareStatement(selWeek);
+                preTemp.setInt(1, csc.id);
+                rsTemp = preTemp.executeQuery();
                 wkList = new ArrayList<>();
                 while (rsTemp.next()) {
                     wkList.add((short) rsTemp.getInt("week"));
@@ -388,10 +382,10 @@ public class CourseServiceIns implements CourseService {
     public CourseSection getCourseSectionByClass(int classId) {
         String selSection = "select *\n" +
                 "from section\n" +
-                "where id_serial = (\n" +
-                "    select sectionId\n" +
-                "    from class\n" +
-                "    where id_serial = ?);";
+                "where section_id = (\n" +
+                "    select c.section_id\n" +
+                "    from class c\n" +
+                "    where c.class_id = ?);";
         ResultSet resultSet;
         PreparedStatement preparedStatement;
         CourseSection section = new CourseSection();
@@ -402,10 +396,10 @@ public class CourseServiceIns implements CourseService {
             preparedStatement = connection.prepareStatement(selSection);
             preparedStatement.setInt(1, classId);
             resultSet = preparedStatement.executeQuery();
-            section.id = resultSet.getInt("id_serial");
+            section.id = resultSet.getInt("section_id");
             section.name = resultSet.getString("name");
-            section.totalCapacity = resultSet.getInt("totalcapacity");
-            section.leftCapacity = resultSet.getInt("leftcapacity");
+            section.totalCapacity = resultSet.getInt("total_capacity");
+            section.leftCapacity = resultSet.getInt("left_capacity");
 
             // close connection
             connection.close();

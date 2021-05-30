@@ -19,7 +19,6 @@ public class SemesterServiceIns implements SemesterService{
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setString(1, name);
             preparedStatement.setObject(2, begin);
