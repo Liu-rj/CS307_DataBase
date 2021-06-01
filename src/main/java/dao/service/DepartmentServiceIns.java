@@ -24,8 +24,6 @@ public class DepartmentServiceIns implements DepartmentService{
             preparedStatement.setString(1, name);
             preparedStatement.execute();
 
-
-
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
