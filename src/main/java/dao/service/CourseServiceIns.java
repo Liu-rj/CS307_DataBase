@@ -1,10 +1,7 @@
 package dao.service;
 
 import cn.edu.sustech.cs307.database.SQLDataSource;
-import cn.edu.sustech.cs307.dto.Course;
-import cn.edu.sustech.cs307.dto.CourseSection;
-import cn.edu.sustech.cs307.dto.CourseSectionClass;
-import cn.edu.sustech.cs307.dto.Student;
+import cn.edu.sustech.cs307.dto.*;
 import cn.edu.sustech.cs307.dto.prerequisite.AndPrerequisite;
 import cn.edu.sustech.cs307.dto.prerequisite.CoursePrerequisite;
 import cn.edu.sustech.cs307.dto.prerequisite.OrPrerequisite;
@@ -19,7 +16,7 @@ import java.util.*;
 import java.sql.*;
 
 
-    public class CourseServiceIns implements CourseService {
+public class CourseServiceIns implements CourseService {
     public static void parsePre(Queue<List<Prerequisite>> presQueue, Set<List<Prerequisite>> resultSet) {
         List<Prerequisite> listTemp;
         Prerequisite preTemp = null;
@@ -51,8 +48,8 @@ import java.sql.*;
 
     @Override
     public void addCourse(String courseId, String courseName, int credit, int classHour, Course.CourseGrading grading, @Nullable Prerequisite coursePrerequisite) {
-        String sql = "insert into course values (default, ?, ?, ?, ?, ?)";
-        String relation = "insert into prerequisite values (?, ?, ?)";
+        String sql = "insert into course values (default, ?, ?, ?, ?, ?);";
+        String relation = "insert into prerequisite values (?, ?, ?);";
         PreparedStatement preparedStatement;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
@@ -82,7 +79,8 @@ import java.sql.*;
                 for (List<Prerequisite> l : resultSet) {
                     for (Prerequisite p : l) {
                         // query id_serial corresponding to courseId
-                        preparedStatement = connection.prepareStatement("select id_serial from course where id = " + ((CoursePrerequisite) p).courseID);
+                        preparedStatement = connection.prepareStatement("select course_id from course where id = ?;");
+                        preparedStatement.setString(1, ((CoursePrerequisite) p).courseID);
                         preparedStatement.execute();
                         id_serial = preparedStatement.getResultSet().getInt(1);
 
@@ -105,14 +103,15 @@ import java.sql.*;
 
     @Override
     public int addCourseSection(String courseId, int semesterId, String sectionName, int totalCapacity) {
-        String courseSection = "insert into coursesection values (default, ?,?,?,?)";
-        String courseSemester = "insert into course_semester values (?,?)";
+        String courseSection = "insert into section values (default, ?,?,?,?);";
+        String courseSemester = "insert into section_semester values (?,?);";
         PreparedStatement preparedStatement;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // query id_serial according to courseId
-            preparedStatement = connection.prepareStatement("select id_serial from course where id = " + courseId);
+            preparedStatement = connection.prepareStatement("select course_id from course where id = ?;");
+            preparedStatement.setString(1, courseId);
             preparedStatement.execute();
             int cid = preparedStatement.getResultSet().getInt(1);
 
@@ -124,21 +123,22 @@ import java.sql.*;
             preparedStatement.setInt(4, totalCapacity);
             preparedStatement.execute();
 
+            // return val for this interface
+            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('section', 'section_id'));");
+            preparedStatement.execute();
+            int curId = preparedStatement.getResultSet().getInt(1);
+
             // insert record into section_semester
             preparedStatement = connection.prepareStatement(courseSemester);
-            preparedStatement.setInt(1, cid);
+            preparedStatement.setInt(1, curId);
             preparedStatement.setInt(2, semesterId);
             preparedStatement.execute();
 
-            // return val for this interface
-            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('coursesection', 'id_serial'));");
-            preparedStatement.execute();
-            int returnVal = preparedStatement.getResultSet().getInt(1);
 
             // close connection
             connection.close();
             preparedStatement.close();
-            return returnVal;
+            return curId;
         } catch (SQLException e) {
             throw new IntegrityViolationException();
         }
@@ -146,43 +146,83 @@ import java.sql.*;
 
     @Override
     public int addCourseSectionClass(int sectionId, int instructorId, DayOfWeek dayOfWeek, List<Short> weekList, short classStart, short classEnd, String location) {
+        String classInsert = "insert into class values (default, ?, ?, ?, ?, ?, ?);";
+        String classWeek = "insert into week_class values (?,?);";
+        PreparedStatement preparedStatement;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-        return 0;
+            // query id_serial according to given location name
+            preparedStatement = connection.prepareStatement("select location_id from location where name = ?;");
+            preparedStatement.setString(1, location);
+            preparedStatement.execute();
+            int lid = preparedStatement.getResultSet().getInt(1);
+
+            // insert record into courseSection table
+            preparedStatement = connection.prepareStatement(classInsert);
+            preparedStatement.setInt(1, sectionId);
+            preparedStatement.setInt(2, instructorId);
+            preparedStatement.setInt(3, dayOfWeek.ordinal());
+            preparedStatement.setInt(4, classStart);
+            preparedStatement.setInt(5, classEnd);
+            preparedStatement.setInt(6, lid);
+            preparedStatement.execute();
+
+            // return val for this interface
+            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('class', 'class_id'));");
+            preparedStatement.execute();
+            int curId = preparedStatement.getResultSet().getInt(1);
+
+            // insert record into week_class
+            preparedStatement = connection.prepareStatement(classWeek);
+            for (Short week : weekList) {
+                preparedStatement.setInt(1, week);
+                preparedStatement.setInt(2, curId);
+                preparedStatement.execute();
+            }
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+            return curId;
+        } catch (SQLException e) {
+            throw new IntegrityViolationException();
+        }
     }
 
     @Override
     public void removeCourse(String courseId) {
         //courseId represents the id of course. For example, CS307, CS309
-        String sql = "delete from Course where Course.id = ?";
+        String delCourse = "delete from course where id = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-            //execute the removeCourse operation
-            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            // execute the removeCourse operation
+            PreparedStatement preparedStatement = connection.prepareStatement(delCourse);
             preparedStatement.setString(1, courseId);
             preparedStatement.execute();
 
-           // close connection
+            // close connection
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
     }
 
     @Override
     public void removeCourseSection(int sectionId) {
-        //TODO:sectionId 具体指什么，从这里看sectionid是一个主键，但是courseSectionid文件的描述为"  /**
-        //     *For example it can represent the id of section "No.1 Chinese class of database principle"
-        //     */"
-        String sql = "delete from CourseSection where CourseSection.id = ?";
+        // sectionId: id_serial in table section
+        String delSection = "delete from section where section_id = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            // execute remove section operation
+            PreparedStatement preparedStatement = connection.prepareStatement(delSection);
             preparedStatement.setInt(1, sectionId);
             preparedStatement.execute();
+
+            // close connection
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
@@ -192,42 +232,185 @@ import java.sql.*;
 
     @Override
     public void removeCourseSectionClass(int classId) {
-        //TODO:现在还不知道这个classId表示的是什么，暂时将它当成CourseSectionClass的primaryKey
-        String sql = "delete from CourseSectionClass where CourseSectionClass.id = ?";
+        // classId: id_serial in table class
+        String sql = "delete from class where class_id = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
+            // execute remove class operation
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setInt(1, classId);
             preparedStatement.execute();
+
+            // close connection
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
     }
 
     @Override
     public List<CourseSection> getCourseSectionsInSemester(String courseId, int semesterId) {
-        return null;
+        String sel = "select *\n" +
+                "from section_semester ss\n" +
+                "         join section s on s.section_id = ss.section_id\n" +
+                "         join course c on c.course_id = s.course_id\n" +
+                "where s.section_id = ?\n" +
+                "  and c.id = ?;";
+        List<CourseSection> sections = new ArrayList<>();
+        PreparedStatement preparedStatement;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            // execute sel to get target sections
+            preparedStatement = connection.prepareStatement(sel);
+            preparedStatement.setInt(1, semesterId);
+            preparedStatement.setString(2, courseId);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                int id = resultSet.getInt("s.section_id");
+                String name = resultSet.getString("s.name");
+                int total = resultSet.getInt("total_capacity");
+                int left = resultSet.getInt("left_capacity");
+
+                CourseSection section = new CourseSection();
+                section.id = id;
+                section.name = name;
+                section.totalCapacity = total;
+                section.leftCapacity = left;
+
+                sections.add(section);
+            }
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return sections;
     }
 
     @Override
     public Course getCourseBySection(int sectionId) {
-        return null;
+        Course course = new Course();
+        String selCourse = "select course_id from section where section_id = ?;";
+        String courseInfo = "select * from course where course_id = ?;";
+        ResultSet resultSet;
+        PreparedStatement preparedStatement;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            // execute get courseId by sectionId operation
+            preparedStatement = connection.prepareStatement(selCourse);
+            preparedStatement.setInt(1, sectionId);
+            resultSet = preparedStatement.executeQuery();
+            int courseId = resultSet.getInt(1);
+
+            // get course info according to queried courseId
+            preparedStatement = connection.prepareStatement(courseInfo);
+            preparedStatement.setInt(1, courseId);
+            resultSet = preparedStatement.executeQuery();
+            course.id = resultSet.getString("id");
+            course.name = resultSet.getString("name");
+            course.credit = resultSet.getInt("credit");
+            course.classHour = resultSet.getInt("class_hour");
+            course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return course;
     }
 
     @Override
     public List<CourseSectionClass> getCourseSectionClasses(int sectionId) {
-        return null;
+        String selClass = "select *\n" +
+                "from class c\n" +
+                "         join instructor i on c.instructor_id = i.ins_id\n" +
+                "         join location l on c.location_id = l.location_id\n" +
+                "where c.section_id = ?;";
+        String selWeek = "select week from week_class where class_id = ?;";
+        ResultSet resultSet, rsTemp;
+        PreparedStatement preparedStatement, preTemp;
+        List<CourseSectionClass> classes = new ArrayList<>();
+        List<Short> wkList;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            // get classId by sectionId operation
+            preparedStatement = connection.prepareStatement(selClass);
+            preparedStatement.setInt(1, sectionId);
+            resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                CourseSectionClass csc = new CourseSectionClass();
+                csc.id = resultSet.getInt("class_id");
+                csc.instructor = new Instructor();
+                csc.instructor.id = resultSet.getInt("instructor_id");
+                csc.instructor.fullName = resultSet.getString("full_name");
+                csc.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
+                csc.classBegin = (short) resultSet.getInt("class_begin");
+                csc.classEnd = (short) resultSet.getInt("class_end");
+                csc.location = resultSet.getString("name");
+
+                // get week
+                preTemp = connection.prepareStatement(selWeek);
+                preTemp.setInt(1, csc.id);
+                rsTemp = preTemp.executeQuery();
+                wkList = new ArrayList<>();
+                while (rsTemp.next()) {
+                    wkList.add((short) rsTemp.getInt("week"));
+                }
+                csc.weekList = wkList;
+                classes.add(csc);
+            }
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return classes;
     }
 
     @Override
     public CourseSection getCourseSectionByClass(int classId) {
-        return null;
+        String selSection = "select *\n" +
+                "from section\n" +
+                "where section_id = (\n" +
+                "    select c.section_id\n" +
+                "    from class c\n" +
+                "    where c.class_id = ?);";
+        ResultSet resultSet;
+        PreparedStatement preparedStatement;
+        CourseSection section = new CourseSection();
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            // get section by classId
+            preparedStatement = connection.prepareStatement(selSection);
+            preparedStatement.setInt(1, classId);
+            resultSet = preparedStatement.executeQuery();
+            section.id = resultSet.getInt("section_id");
+            section.name = resultSet.getString("name");
+            section.totalCapacity = resultSet.getInt("total_capacity");
+            section.leftCapacity = resultSet.getInt("left_capacity");
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return section;
     }
 
+    // TODO: first finish enroll student then complete this method, may need a new table
     @Override
     public List<Student> getEnrolledStudentsInSemester(String courseId, int semesterId) {
         return null;
