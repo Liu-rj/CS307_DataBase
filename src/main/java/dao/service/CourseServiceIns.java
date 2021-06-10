@@ -17,10 +17,36 @@ import java.sql.*;
 
 
 public class CourseServiceIns implements CourseService {
+//    public static void main(String[] args) {
+//        CoursePrerequisite a = new CoursePrerequisite("RD267");
+//        CoursePrerequisite b = new CoursePrerequisite("MA102A");
+//        CoursePrerequisite c = new CoursePrerequisite("MA102B");
+//        List<Prerequisite> orList = new ArrayList<>();
+//        orList.add(b);
+//        orList.add(c);
+//        Prerequisite or = new OrPrerequisite(orList);
+//        List<Prerequisite> andList = new ArrayList<>();
+//        andList.add(a);
+//        andList.add(or);
+//        Prerequisite coursePrerequisite = new AndPrerequisite(andList);
+//        Queue<List<Prerequisite>> presQueue = new LinkedList<>();
+//        Set<List<Prerequisite>> result = new HashSet<>(); // result and group
+//        presQueue.add(new ArrayList<>());
+//        presQueue.peek().add(coursePrerequisite);
+//        parsePre(presQueue, result);
+//        for (List<Prerequisite> l : result) {
+//            for (Prerequisite p : l) {
+//                System.out.print(((CoursePrerequisite) p).courseID + " ");
+//            }
+//            System.out.println();
+//        }
+//    }
+
     public static void parsePre(Queue<List<Prerequisite>> presQueue, Set<List<Prerequisite>> resultSet) {
         List<Prerequisite> listTemp;
-        Prerequisite preTemp = null;
+        Prerequisite preTemp;
         while (!presQueue.isEmpty()) {
+            preTemp = null;
             listTemp = presQueue.poll();
             for (Prerequisite p : listTemp) {
                 if (p instanceof AndPrerequisite || p instanceof OrPrerequisite) {
@@ -51,6 +77,8 @@ public class CourseServiceIns implements CourseService {
         String sql = "insert into course values (default, ?, ?, ?, ?, ?);";
         String relation = "insert into prerequisite values (?, ?, ?);";
         PreparedStatement preparedStatement;
+        ResultSet resultSet;
+
 
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
@@ -65,25 +93,31 @@ public class CourseServiceIns implements CourseService {
             preparedStatement.execute();
 
             // return val for this interface
-            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('course', 'id_serial'));");
-            preparedStatement.execute();
-            int curVal = preparedStatement.getResultSet().getInt(1);
+            preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('course', 'course_id'));");
+
+            resultSet = preparedStatement.executeQuery();
+            int curVal = 0;
+            while (resultSet.next()) {
+                curVal = resultSet.getInt(1);
+            }
 
             // parse and add relation prerequisite
             if (coursePrerequisite != null) {
                 Queue<List<Prerequisite>> presQueue = new LinkedList<>();
-                Set<List<Prerequisite>> resultSet = new HashSet<>(); // result and group
+                Set<List<Prerequisite>> result = new HashSet<>(); // result and group
                 presQueue.add(new ArrayList<>());
                 presQueue.peek().add(coursePrerequisite);
-                parsePre(presQueue, resultSet);
-                int groupNum = 1, id_serial;
-                for (List<Prerequisite> l : resultSet) {
+                parsePre(presQueue, result);
+                int groupNum = 1, id_serial = 0;
+                for (List<Prerequisite> l : result) {
                     for (Prerequisite p : l) {
                         // query id_serial corresponding to courseId
                         preparedStatement = connection.prepareStatement("select course_id from course where id_code = ?;");
                         preparedStatement.setString(1, ((CoursePrerequisite) p).courseID);
-                        preparedStatement.execute();
-                        id_serial = preparedStatement.getResultSet().getInt(1);
+                        resultSet = preparedStatement.executeQuery();
+                        while (resultSet.next()) {
+                            id_serial = resultSet.getInt(1);
+                        }
 
                         // insert record(curVal, id_serial, groupNum) into pre table
                         preparedStatement = connection.prepareStatement(relation);
@@ -91,14 +125,13 @@ public class CourseServiceIns implements CourseService {
                         preparedStatement.setInt(2, id_serial);
                         preparedStatement.setInt(3, groupNum);
                         preparedStatement.execute();
-                        groupNum++;
                     }
+                    groupNum++;
                 }
             }
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
-
             throw new IntegrityViolationException();
         }
     }
@@ -108,14 +141,18 @@ public class CourseServiceIns implements CourseService {
         String courseSection = "insert into section values (default, ?,?,?,?);";
         String courseSemester = "insert into section_semester values (?,?);";
         PreparedStatement preparedStatement;
+        ResultSet resultSet;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // query id_serial according to courseId
             preparedStatement = connection.prepareStatement("select course_id from course where id_code = ?;");
             preparedStatement.setString(1, courseId);
-            preparedStatement.execute();
-            int cid = preparedStatement.getResultSet().getInt(1);
+            resultSet = preparedStatement.executeQuery();
+            int cid = 0;
+            while (resultSet.next()) {
+                cid = resultSet.getInt(1);
+            }
 
             // insert record into courseSection table
             preparedStatement = connection.prepareStatement(courseSection);
@@ -127,8 +164,11 @@ public class CourseServiceIns implements CourseService {
 
             // return val for this interface
             preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('section', 'section_id'));");
-            preparedStatement.execute();
-            int curId = preparedStatement.getResultSet().getInt(1);
+            resultSet = preparedStatement.executeQuery();
+            int curId = 0;
+            while (resultSet.next()) {
+                curId = resultSet.getInt(1);
+            }
 
             // insert record into section_semester
             preparedStatement = connection.prepareStatement(courseSemester);
@@ -151,14 +191,9 @@ public class CourseServiceIns implements CourseService {
         String classInsert = "insert into class values (default, ?, ?, ?, ?, ?, ?);";
         String classWeek = "insert into week_class values (?,?);";
         PreparedStatement preparedStatement;
+        ResultSet resultSet;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
-
-            // query id_serial according to given location name
-            preparedStatement = connection.prepareStatement("select location_id from location where name = ?;");
-            preparedStatement.setString(1, location);
-            preparedStatement.execute();
-            int lid = preparedStatement.getResultSet().getInt(1);
 
             // insert record into courseSection table
             preparedStatement = connection.prepareStatement(classInsert);
@@ -167,13 +202,16 @@ public class CourseServiceIns implements CourseService {
             preparedStatement.setInt(3, dayOfWeek.ordinal());
             preparedStatement.setInt(4, classStart);
             preparedStatement.setInt(5, classEnd);
-            preparedStatement.setInt(6, lid);
+            preparedStatement.setString(6, location);
             preparedStatement.execute();
 
             // return val for this interface
             preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('class', 'class_id'));");
-            preparedStatement.execute();
-            int curId = preparedStatement.getResultSet().getInt(1);
+            resultSet = preparedStatement.executeQuery();
+            int curId = 0;
+            while (resultSet.next()) {
+                curId = resultSet.getInt(1);
+            }
 
             // insert record into week_class
             preparedStatement = connection.prepareStatement(classWeek);
@@ -254,8 +292,43 @@ public class CourseServiceIns implements CourseService {
 
     @Override
     public List<Course> getAllCourses() {
-        //TODO:需要完成这个新加的方法
-        return null;
+        String allCourseInf = "select id_code,name,credit,class_hour,grading from course";
+
+        List<Course> allCourseInformation = new ArrayList<>();
+
+        PreparedStatement preparedStatement;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            // execute sel to get target sections
+            preparedStatement = connection.prepareStatement(allCourseInf);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+
+                Course tempCourse = new Course();
+                tempCourse.id = resultSet.getString(1);
+                tempCourse.name = resultSet.getString(2);
+                tempCourse.credit = resultSet.getInt(3);
+                tempCourse.classHour = resultSet.getInt(4);
+                if (resultSet.getBoolean(5) == false) { //pass or fail grade
+                    tempCourse.grading = Course.CourseGrading.PASS_OR_FAIL;
+                } else {
+                    tempCourse.grading = Course.CourseGrading.HUNDRED_MARK_SCORE;
+                }
+
+                allCourseInformation.add(tempCourse);
+
+            }
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return allCourseInformation;
     }
 
     @Override
@@ -340,13 +413,12 @@ public class CourseServiceIns implements CourseService {
         String selClass = "select *\n" +
                 "from class c\n" +
                 "         join instructor i on c.instructor_id = i.ins_id\n" +
-                "         join location l on c.location_id = l.location_id\n" +
                 "where c.section_id = ?;";
         String selWeek = "select week from week_class where class_id = ?;";
         ResultSet resultSet, rsTemp;
         PreparedStatement preparedStatement, preTemp;
         List<CourseSectionClass> classes = new ArrayList<>();
-        List<Short> wkList;
+        Set<Short> wkList;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -363,19 +435,18 @@ public class CourseServiceIns implements CourseService {
                 csc.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
                 csc.classBegin = (short) resultSet.getInt("class_begin");
                 csc.classEnd = (short) resultSet.getInt("class_end");
-                csc.location = resultSet.getString("name");
+                csc.location = resultSet.getString("location");
 
                 // get week
                 preTemp = connection.prepareStatement(selWeek);
                 preTemp.setInt(1, csc.id);
                 rsTemp = preTemp.executeQuery();
-                wkList = new ArrayList<>();
+                wkList = new HashSet<>();
                 while (rsTemp.next()) {
                     wkList.add((short) rsTemp.getInt("week"));
                 }
-                //csc.weekList = wkList;
-                csc.weekList = (Set<Short>) wkList;
-                //TODO:这里的set没有进行修改
+
+                csc.weekList = wkList;
                 classes.add(csc);
             }
 
@@ -419,6 +490,7 @@ public class CourseServiceIns implements CourseService {
         }
         return section;
     }
+
 
     // TODO: first finish enroll student then complete this method, may need a new table
     @Override

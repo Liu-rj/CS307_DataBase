@@ -4,6 +4,7 @@ import cn.edu.sustech.cs307.dto.Instructor;
 import cn.edu.sustech.cs307.dto.Major;
 import cn.edu.sustech.cs307.dto.Student;
 import cn.edu.sustech.cs307.dto.User;
+import cn.edu.sustech.cs307.exception.EntityNotFoundException;
 import cn.edu.sustech.cs307.service.*;
 
 import java.sql.Connection;
@@ -128,19 +129,15 @@ public class UserServiceIns implements UserService{
                 user.fullName = resultSet.getString(2);
             }
 
-
-
             // close connection
             connection.close();
             preparedStatement.close();
 
+            // TODO: 确认user返回不用单独判断为null
             return user;
-
         } catch (SQLException e) {
             e.printStackTrace();
+            throw new EntityNotFoundException();
         }
-
-        //TODO:这里的return null还需要吗
-        return null;
     }
 }

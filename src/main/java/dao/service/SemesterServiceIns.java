@@ -16,7 +16,8 @@ public class SemesterServiceIns implements SemesterService {
             throw new IllegalArgumentException();
         }
         String sql = "insert into semester values (default,?,?,?)";
-        int curVal;
+        int curVal = 0;
+        ResultSet resultSet;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -27,15 +28,18 @@ public class SemesterServiceIns implements SemesterService {
             preparedStatement.execute();
 
             preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('semester', 'semester_id'));");
-            preparedStatement.execute();
-            curVal = preparedStatement.getResultSet().getInt(1);
+            resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                curVal = resultSet.getInt(1);
+            }
 
             connection.close();
             preparedStatement.close();
+
+            return curVal;
         } catch (SQLException e) {
             throw new IntegrityViolationException();
         }
-        return curVal;
     }
 
     @Override

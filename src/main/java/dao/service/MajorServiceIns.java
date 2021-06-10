@@ -16,6 +16,8 @@ public class MajorServiceIns implements MajorService{
     public int addMajor(String name, int departmentId) {
         String add = "insert into major values (default, ?, ?)";
         int curVal = 0;
+        ResultSet resultSet;
+
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -25,8 +27,10 @@ public class MajorServiceIns implements MajorService{
             preparedStatement.execute();
 
             preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('major', 'major_id'));");
-            preparedStatement.execute();
-            curVal = preparedStatement.getResultSet().getInt(1);
+            resultSet = preparedStatement.executeQuery();
+            while(resultSet.next()){
+                curVal = resultSet.getInt(1);
+            }
 
             connection.close();
             preparedStatement.close();
@@ -96,9 +100,11 @@ public class MajorServiceIns implements MajorService{
             preparedStatement.setInt(1, majorId);
             resultSet = preparedStatement.executeQuery();
             DepartmentServiceIns departmentServiceIns = new DepartmentServiceIns();
-            major.id = resultSet.getInt("major_id");
-            major.name = resultSet.getString("name");
-            major.department = departmentServiceIns.getDepartment(resultSet.getInt("department_id"));
+            while (resultSet.next()) {
+                major.id = resultSet.getInt("major_id");
+                major.name = resultSet.getString("name");
+                major.department = departmentServiceIns.getDepartment(resultSet.getInt("department_id"));
+            }
 
             connection.close();
             preparedStatement.close();
@@ -110,7 +116,7 @@ public class MajorServiceIns implements MajorService{
 
     @Override
     public void addMajorCompulsoryCourse(int majorId, String courseId) {
-        String selCourse = "select course_id from course where id = ?;";
+        String selCourse = "select course_id from course where id_code = ?;";
         String insert = "insert into course_major values (?, ?, true)";
         ResultSet resultSet;
         PreparedStatement preparedStatement;
@@ -120,7 +126,10 @@ public class MajorServiceIns implements MajorService{
             preparedStatement = connection.prepareStatement(selCourse);
             preparedStatement.setString(1, courseId);
             resultSet = preparedStatement.executeQuery();
-            int cid = resultSet.getInt(1);
+            int cid = 0;
+            while (resultSet.next()) {
+                cid = resultSet.getInt(1);
+            }
 
             preparedStatement = connection.prepareStatement(insert);
             preparedStatement.setInt(1, cid);
@@ -136,7 +145,7 @@ public class MajorServiceIns implements MajorService{
 
     @Override
     public void addMajorElectiveCourse(int majorId, String courseId) {
-        String selCourse = "select course_id from course where id = ?;";
+        String selCourse = "select course_id from course where id_code = ?;";
         String insert = "insert into course_major values (?, ?, false)";
         ResultSet resultSet;
         PreparedStatement preparedStatement;
@@ -146,7 +155,10 @@ public class MajorServiceIns implements MajorService{
             preparedStatement = connection.prepareStatement(selCourse);
             preparedStatement.setString(1, courseId);
             resultSet = preparedStatement.executeQuery();
-            int cid = resultSet.getInt(1);
+            int cid = 0;
+            while (resultSet.next()) {
+                cid = resultSet.getInt(1);
+            }
 
             preparedStatement = connection.prepareStatement(insert);
             preparedStatement.setInt(1, cid);

@@ -16,6 +16,7 @@ public class DepartmentServiceIns implements DepartmentService {
     public int addDepartment(String name) {
         String sql = "insert into department values (default, ?)";
         int curVal = 0;
+        ResultSet resultSet;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -24,8 +25,10 @@ public class DepartmentServiceIns implements DepartmentService {
             preparedStatement.execute();
 
             preparedStatement = connection.prepareStatement("select currval(pg_get_serial_sequence('department', 'department_id'));");
-            preparedStatement.execute();
-            curVal = preparedStatement.getResultSet().getInt(1);
+            resultSet =   preparedStatement.executeQuery();
+            while(resultSet.next()){
+                curVal = resultSet.getInt(1);
+            }
 
             connection.close();
             preparedStatement.close();
