@@ -51,6 +51,7 @@ public class CourseServiceIns implements CourseService {
         String sql = "insert into course values (default, ?, ?, ?, ?, ?);";
         String relation = "insert into prerequisite values (?, ?, ?);";
         PreparedStatement preparedStatement;
+
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -79,7 +80,7 @@ public class CourseServiceIns implements CourseService {
                 for (List<Prerequisite> l : resultSet) {
                     for (Prerequisite p : l) {
                         // query id_serial corresponding to courseId
-                        preparedStatement = connection.prepareStatement("select course_id from course where id = ?;");
+                        preparedStatement = connection.prepareStatement("select course_id from course where id_code = ?;");
                         preparedStatement.setString(1, ((CoursePrerequisite) p).courseID);
                         preparedStatement.execute();
                         id_serial = preparedStatement.getResultSet().getInt(1);
@@ -97,6 +98,7 @@ public class CourseServiceIns implements CourseService {
             connection.close();
             preparedStatement.close();
         } catch (SQLException e) {
+
             throw new IntegrityViolationException();
         }
     }
@@ -110,7 +112,7 @@ public class CourseServiceIns implements CourseService {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // query id_serial according to courseId
-            preparedStatement = connection.prepareStatement("select course_id from course where id = ?;");
+            preparedStatement = connection.prepareStatement("select course_id from course where id_code = ?;");
             preparedStatement.setString(1, courseId);
             preparedStatement.execute();
             int cid = preparedStatement.getResultSet().getInt(1);
@@ -145,7 +147,7 @@ public class CourseServiceIns implements CourseService {
     }
 
     @Override
-    public int addCourseSectionClass(int sectionId, int instructorId, DayOfWeek dayOfWeek, List<Short> weekList, short classStart, short classEnd, String location) {
+    public int addCourseSectionClass(int sectionId, int instructorId, DayOfWeek dayOfWeek, Set<Short> weekList, short classStart, short classEnd, String location) {
         String classInsert = "insert into class values (default, ?, ?, ?, ?, ?, ?);";
         String classWeek = "insert into week_class values (?,?);";
         PreparedStatement preparedStatement;
@@ -193,7 +195,7 @@ public class CourseServiceIns implements CourseService {
     @Override
     public void removeCourse(String courseId) {
         //courseId represents the id of course. For example, CS307, CS309
-        String delCourse = "delete from course where id = ?;";
+        String delCourse = "delete from course where id_code = ?;";
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
@@ -251,13 +253,19 @@ public class CourseServiceIns implements CourseService {
     }
 
     @Override
+    public List<Course> getAllCourses() {
+        //TODO:需要完成这个新加的方法
+        return null;
+    }
+
+    @Override
     public List<CourseSection> getCourseSectionsInSemester(String courseId, int semesterId) {
         String sel = "select *\n" +
                 "from section_semester ss\n" +
                 "         join section s on s.section_id = ss.section_id\n" +
                 "         join course c on c.course_id = s.course_id\n" +
                 "where s.section_id = ?\n" +
-                "  and c.id = ?;";
+                "  and c.id_code = ?;";
         List<CourseSection> sections = new ArrayList<>();
         PreparedStatement preparedStatement;
         try {
@@ -365,7 +373,9 @@ public class CourseServiceIns implements CourseService {
                 while (rsTemp.next()) {
                     wkList.add((short) rsTemp.getInt("week"));
                 }
-                csc.weekList = wkList;
+                //csc.weekList = wkList;
+                csc.weekList = (Set<Short>) wkList;
+                //TODO:这里的set没有进行修改
                 classes.add(csc);
             }
 

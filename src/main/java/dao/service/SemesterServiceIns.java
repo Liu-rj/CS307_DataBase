@@ -15,7 +15,6 @@ public class SemesterServiceIns implements SemesterService {
         if (end.before(begin)) {
             throw new IllegalArgumentException();
         }
-
         String sql = "insert into semester values (default,?,?,?)";
         int curVal;
         try {

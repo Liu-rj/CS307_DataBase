@@ -4,13 +4,19 @@ import java.util.Objects;
 
 public class Course {
     public enum CourseGrading {
-        PASS_OF_FAIL, HUNDRED_MARK_SCORE
+        PASS_OR_FAIL, HUNDRED_MARK_SCORE
     }
 
+    // A courseId is valid if it has been added to the system with addCourse()
+    // Do not check whether it is 'CS307' or '307CS'
     public String id;
+
     public String name;
+
     public int credit;
+
     public int classHour;
+
     public CourseGrading grading;
 
     @Override

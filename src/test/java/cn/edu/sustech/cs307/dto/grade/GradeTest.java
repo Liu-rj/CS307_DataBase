@@ -14,6 +14,7 @@ public class GradeTest {
                 return self.name();
             }
 
+
             @Override
             public String match(HundredMarkGrade self) {
                 return Short.toString(self.mark);

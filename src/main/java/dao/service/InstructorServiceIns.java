@@ -13,7 +13,7 @@ import java.util.List;
 
 public class InstructorServiceIns implements InstructorService{
     @Override
-    public int addInstructor(int userId, String firstName, String lastName) {
+    public void addInstructor(int userId, String firstName, String lastName) {
         String sql = "insert into instructor values (?, ?);";
         PreparedStatement preparedStatement;
         try {
@@ -32,11 +32,11 @@ public class InstructorServiceIns implements InstructorService{
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return userId;
     }
 
     @Override
     public List<CourseSection> getInstructedCourseSections(int instructorId, int semesterId) {
+        //TODO:这个方法报红的地方需要进行修改
         String sel = "select *\n" +
                 "from section_semester ss\n" +
                 "         join user_section us on ss.section_id = us.section_id\n" +
