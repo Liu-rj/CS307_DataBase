@@ -39,10 +39,16 @@ public class InstructorServiceIns implements InstructorService{
         //TODO:这个方法报红的地方需要进行修改
         String sel = "select *\n" +
                 "from section_semester ss\n" +
-                "         join user_section us on ss.section_id = us.section_id\n" +
-                "         join section s on s.section_id = ss.section_id\n" +
-                "where us.user_id = ?\n" +
+                "         join ins_section us on ss.section_id = us.section_id\n" +
+                "where us.ins_id = ?\n" +
                 "  and ss.semester_id = ?;";
+
+//        String sel = "select *\n" +
+//                "from section_semester ss\n" +
+//                "         join user_section us on ss.section_id = us.section_id\n" +
+//                "         join section s on s.section_id = ss.section_id\n" +
+//                "where us.user_id = ?\n" +
+//                "  and ss.semester_id = ?;";
         List<CourseSection> sections = new ArrayList<>();
         CourseSection section;
         ResultSet resultSet;

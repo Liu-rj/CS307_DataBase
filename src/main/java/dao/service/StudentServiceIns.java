@@ -10,6 +10,8 @@ import cn.edu.sustech.cs307.exception.IntegrityViolationException;
 import cn.edu.sustech.cs307.service.*;
 import dao.factory.ServiceFactoryIns;
 
+
+
 import javax.annotation.Nullable;
 import java.sql.*;
 import java.sql.Date;
@@ -443,12 +445,58 @@ public class StudentServiceIns implements StudentService{
     @Override
     public CourseTable getCourseTable(int studentId, Date date) {
         //查询学生在当前周次的课程表
-        //TODO：data类型周次是怎么进行具体反应的？
         //需要使用除法来计算出当前的周次
         //首先要获取出来整个的日期范围
         //需要获取到所有的日期，然后来进行比较
+        List<Semester> allSemesterList = null;
+        //TODO:这里semester的值是怎么得到的还不知道（问题还没有解决）
+
+        CourseTable  getCourseTableElement = new CourseTable();
+
+        int semesterId;
+        long weekth;
+        for (int i = 0; i < allSemesterList.size(); i++) {
+            //开始进行循环
+           Date tempDateBefore =  allSemesterList.get(i).begin;
+           int beforeCompare =  tempDateBefore.compareTo(date);
+           Date tempDateEnd =  allSemesterList.get(i).end;
+           int afterCompare = tempDateEnd.compareTo(date);
+            if(beforeCompare >= 0 && afterCompare <= 0){
+                //说明传入的日期在这两个学期中间
+                //需要返回整个周次的课程表
+                //需要知道当前是哪个学期和相应的周次信息
+                //这个date的值直接会告诉是那一天
+               semesterId = allSemesterList.get(i).id; //得到有关周次的相关信息
+
+              long timeDis = Math.abs(date.getTime()-allSemesterList.get(i).begin.getTime());//获取到天数，然后利用天数来计算周次
+              long day = timeDis / (1000 * 60 * 60 * 24);
+               weekth = ( day / 7 ) + 1; //weekth表示当前的周次是第几周
+                //TODO:这里的计算可能出现问题
+                //根据这个周次来继续去找
+            break;
+            }
+        }
+
+        String sectionSet = "select course_id from course where id_code = ?";
+        PreparedStatement preparedStatement;
+        ResultSet resultSet;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+            preparedStatement = connection.prepareStatement(sectionSet);
 
 
+        } catch (SQLException e) {
+            e.printStackTrace();
+            //TODO:这里的抛出异常要怎么进行处理？
+        }
+
+        //接下来做数据库相应的查询工作来完成后续的内容
+
+        //首先先得出来所有section的集合,然后再添加小班的名称
+
+
+
+        CourseTable.CourseTableEntry test = new CourseTable.CourseTableEntry();
 
 
 
@@ -460,7 +508,6 @@ public class StudentServiceIns implements StudentService{
         //需要由这个courseid得到course对应的编号才行
         int courseId_num;
         String find_courseId_num = "select course_id from course where id_code = ?";
-
 
         PreparedStatement preparedStatement;
       try {
