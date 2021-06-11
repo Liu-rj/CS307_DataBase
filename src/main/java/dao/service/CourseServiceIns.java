@@ -199,7 +199,7 @@ public class CourseServiceIns implements CourseService {
             preparedStatement = connection.prepareStatement(classInsert);
             preparedStatement.setInt(1, sectionId);
             preparedStatement.setInt(2, instructorId);
-            preparedStatement.setInt(3, dayOfWeek.ordinal());
+            preparedStatement.setInt(3, dayOfWeek.ordinal() + 1);
             preparedStatement.setInt(4, classStart);
             preparedStatement.setInt(5, classEnd);
             preparedStatement.setString(6, location);
@@ -492,9 +492,46 @@ public class CourseServiceIns implements CourseService {
     }
 
 
-    // TODO: first finish enroll student then complete this method, may need a new table
     @Override
     public List<Student> getEnrolledStudentsInSemester(String courseId, int semesterId) {
-        return null;
+        //一个学生只能同时在一门课的一个section里面
+        String temp = "select s.std_id,full_name,enrolled_date,major_id from std_section\n" +
+                "join section_semester ss on std_section.section_id = ss.section_id\n" +
+                "join student s on std_section.std_id = s.std_id\n" +
+                "join section s2 on ss.section_id = s2.section_id\n" +
+                "join course c on s2.course_id = c.course_id\n" +
+                "where id_code = ?\n" +
+                "and semester_id = ?;\n ";
+        ResultSet resultSet;
+        PreparedStatement preparedStatement;
+        List<Student> enrolledStudents = new ArrayList<>();
+
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            // get section by classId
+            preparedStatement = connection.prepareStatement(temp);
+
+            preparedStatement.setString(1, courseId);
+            preparedStatement.setInt(2, semesterId);
+
+            resultSet = preparedStatement.executeQuery();
+
+            while(resultSet.next()){
+                Student tempStudent = new Student();
+                tempStudent.id = resultSet.getInt(1);
+                tempStudent.fullName = resultSet.getString(2);
+                tempStudent.enrolledDate = resultSet.getDate(3);
+                tempStudent.major = (Major) resultSet.getObject(4);
+                enrolledStudents.add(tempStudent);
+            }
+
+            // close connection
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return enrolledStudents;
     }
 }
