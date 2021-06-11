@@ -125,17 +125,46 @@ public class StudentServiceIns implements StudentService {
                 "         where ss.semester_id = ?\n" +
                 "     ) a\n" +
                 "order by (a.course_id, search_name);";
+
+        String selAllSection = "select * from (\n" +
+                "                  select s.section_id,\n" +
+                "                         s.course_id,\n" +
+                "                         s.name as section,\n" +
+                "                         total_capacity,\n" +
+                "                         left_capacity,\n" +
+                "                         id_code,\n" +
+                "                         c.name as course,\n" +
+                "                         credit,\n" +
+                "                         class_hour,\n" +
+                "                         grading,\n" +
+                "                         class_id,\n" +
+                "                         instructor_id,\n" +
+                "                         day_of_week,\n" +
+                "                         class_begin,\n" +
+                "                         class_end,\n" +
+                "                         location,\n" +
+                "                         i.full_name,\n" +
+                "                         (c.name || '[' || s.name || ']') as search_name\n" +
+                "                  from section s\n" +
+                "                           join course c on c.course_id = s.course_id\n" +
+                "                           join class c2 on s.section_id = c2.section_id\n" +
+                "                           join instructor i on c2.instructor_id = i.ins_id\n" +
+                "              ) a\n" +
+                "order by search_name;";
+
+        List<CourseSearchEntry> allCourses = new ArrayList<>();
         List<CourseSearchEntry> totalEntries = new ArrayList<>();
         PreparedStatement preparedStatement;
         ResultSet resultSet;
+        CourseService courseService = new CourseServiceIns();
         try {
+
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-            // execute sel to get total entries without constraints
+            // execute sel
             preparedStatement = connection.prepareStatement(selAll);
             preparedStatement.setInt(1, semesterId);
             resultSet = preparedStatement.executeQuery();
-
             CourseSection section = new CourseSection();
             Set<CourseSectionClass> sectionClasses = new HashSet<>();
             while (resultSet.next()) {
@@ -182,6 +211,58 @@ public class StudentServiceIns implements StudentService {
                     entry.sectionClasses = sectionClasses;
 
                     totalEntries.add(entry);
+                }
+            }
+
+            // execute sel
+            preparedStatement = connection.prepareStatement(selAllSection);
+            resultSet = preparedStatement.executeQuery();
+            section = new CourseSection();
+            sectionClasses = new HashSet<>();
+            while (resultSet.next()) {
+                if (resultSet.getInt("section_id") == section.id) {
+                    CourseSectionClass cls = new CourseSectionClass();
+                    cls.id = resultSet.getInt("class_id");
+                    cls.instructor = new Instructor();
+                    cls.instructor.id = resultSet.getInt("instructor_id");
+                    cls.instructor.fullName = resultSet.getString("full_name");
+                    cls.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
+                    cls.classBegin = (short) resultSet.getInt("class_begin");
+                    cls.classEnd = (short) resultSet.getInt("class_end");
+                    cls.location = resultSet.getString("location");
+                    sectionClasses.add(cls);
+                } else {
+                    CourseSearchEntry entry = new CourseSearchEntry();
+
+                    Course course = new Course();
+                    course.id = resultSet.getString("id_code");
+                    course.name = resultSet.getString("course");
+                    course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+                    course.credit = resultSet.getInt("credit");
+                    course.classHour = resultSet.getInt("class_hour");
+                    entry.course = course;
+
+                    section = new CourseSection();
+                    section.id = resultSet.getInt("section_id");
+                    section.name = resultSet.getString("section");
+                    section.totalCapacity = resultSet.getInt("total_capacity");
+                    section.leftCapacity = resultSet.getInt("left_capacity");
+                    entry.section = section;
+
+                    sectionClasses = new HashSet<>();
+                    CourseSectionClass cls = new CourseSectionClass();
+                    cls.id = resultSet.getInt("class_id");
+                    cls.instructor = new Instructor();
+                    cls.instructor.id = resultSet.getInt("instructor_id");
+                    cls.instructor.fullName = resultSet.getString("full_name");
+                    cls.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
+                    cls.classBegin = (short) resultSet.getInt("class_begin");
+                    cls.classEnd = (short) resultSet.getInt("class_end");
+                    cls.location = resultSet.getString("location");
+                    sectionClasses.add(cls);
+                    entry.sectionClasses = sectionClasses;
+
+                    allCourses.add(entry);
                 }
             }
 
@@ -262,6 +343,35 @@ public class StudentServiceIns implements StudentService {
                 totalEntries.removeIf(e -> !passedPrerequisitesForCourse(studentId, e.course.id));
             }
 
+//            for (CourseSearchEntry e : totalEntries) {
+//                List<String> conflict = new ArrayList<>();
+//                for (CourseSearchEntry target : allCourses) {
+//                    if (e.course.id.equals(target.course.id)) {
+//                        conflict.add(target.course.name + '[' + target.section.name + ']');
+//                    } else {
+//                        for (CourseSectionClass cls : e.sectionClasses) {
+//                            for (CourseSectionClass clsTarget : target.sectionClasses) {
+//                                for (Short week : cls.weekList) {
+//                                    for (Short targetWeek : clsTarget.weekList) {
+//                                        if (week.equals(targetWeek)) {
+//                                            if (cls.dayOfWeek.equals(clsTarget.dayOfWeek)) {
+//                                                if ((cls.classBegin >= clsTarget.classBegin && cls.classBegin <= clsTarget.classEnd)
+//                                                        || (cls.classEnd >= clsTarget.classBegin && cls.classEnd <= clsTarget.classEnd)
+//                                                        || (clsTarget.classBegin >= cls.classBegin && clsTarget.classBegin <= cls.classEnd)
+//                                                        || (clsTarget.classEnd >= cls.classBegin && clsTarget.classEnd <= cls.classEnd)) {
+//                                                    conflict.add(target.course.name + '[' + target.section.name + ']');
+//                                                }
+//                                            }
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//                e.conflictCourseNames = conflict;
+//            }
+
             // TODO:
 //            if (ignoreConflict) {
 //                totalEntries.removeIf(e -> );
@@ -273,9 +383,8 @@ public class StudentServiceIns implements StudentService {
     }
 
     @Override
-    public EnrollResult enrollCourse(int studentId, int sectionId) {
-        PreparedStatement preparedStatement;
-        ResultSet resultSet;
+    public synchronized EnrollResult enrollCourse(int studentId, int sectionId) {
+
         String insertStudent = "insert into std_section values(?,?,null,null);";
         //COURSE_NOT_FOUND
         try {
@@ -298,6 +407,8 @@ public class StudentServiceIns implements StudentService {
             }
 
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
+            PreparedStatement preparedStatement;
+            ResultSet resultSet;
 
             String sectionToCourse = "select id_code from section\n" +
                     "join course c on section.course_id = c.course_id\n" +
@@ -320,14 +431,16 @@ public class StudentServiceIns implements StudentService {
 
             //TODO:不知道这样子改写是不是对的
             Connection connection2 = SQLDataSource.getInstance().getSQLConnection();
+            PreparedStatement preparedStatement2;
 
-            preparedStatement = connection.prepareStatement(insertStudent);
-            preparedStatement.setInt(1,studentId);
-            preparedStatement.setInt(2,sectionId);
-            preparedStatement.execute();
+
+            preparedStatement2 = connection2.prepareStatement(insertStudent);
+            preparedStatement2.setInt(1,studentId);
+            preparedStatement2.setInt(2,sectionId);
+            preparedStatement2.execute();
 
             connection2.close();
-            preparedStatement.close();
+            preparedStatement2.close();
 
             // close connection
 
@@ -377,7 +490,7 @@ public class StudentServiceIns implements StudentService {
             preparedStatement.setInt(2, sectionId);
 
             int gradeScore;
-            int gradeType;
+            boolean gradeType;
 
             if(grade == null){
                 preparedStatement.setObject(3,null);
@@ -387,20 +500,20 @@ public class StudentServiceIns implements StudentService {
                 if (grade instanceof HundredMarkGrade) {
                     HundredMarkGrade temp = (HundredMarkGrade) grade;
                     gradeScore = temp.mark;
-                    gradeType = 1;
+                    gradeType = true;
                 } else {
                     PassOrFailGrade temp = (PassOrFailGrade) grade;
                     if (temp.equals(PassOrFailGrade.PASS)) {
                         gradeScore = 1;
-                        gradeType = 0;
+                        gradeType = false;
                     } else {
                         gradeScore = 0;
-                        gradeType = 1;
+                        gradeType = false;
                     }
                 }
 
                 preparedStatement.setInt(3, gradeScore);
-                preparedStatement.setInt(4, gradeType);
+                preparedStatement.setBoolean(4, gradeType);
             }
 
 
@@ -429,7 +542,7 @@ public class StudentServiceIns implements StudentService {
             preparedStatement.setInt(2, sectionId);
 
             int gradeScore;
-            int gradeType;
+            boolean gradeType;
 
 
             if(grade == null){
@@ -439,20 +552,20 @@ public class StudentServiceIns implements StudentService {
                 if (grade instanceof HundredMarkGrade) {
                     HundredMarkGrade temp = (HundredMarkGrade) grade;
                     gradeScore = temp.mark;
-                    gradeType = 1;
+                    gradeType = true;
                 } else {
                     PassOrFailGrade temp = (PassOrFailGrade) grade;
                     if (temp.equals(PassOrFailGrade.PASS)) {
                         gradeScore = 1;
-                        gradeType = 0;
+                        gradeType = false;
                     } else {
                         gradeScore = 0;
-                        gradeType = 1;
+                        gradeType = false;
                     }
                 }
 
                 preparedStatement.setInt(3, gradeScore);
-                preparedStatement.setInt(4, gradeType);
+                preparedStatement.setBoolean(4, gradeType);
             }
 
             preparedStatement.execute();
@@ -547,15 +660,15 @@ public class StudentServiceIns implements StudentService {
         //需要使用除法来计算出当前的周次
         //首先要获取出来整个的日期范围
         //需要获取到所有的日期，然后来进行比较
-        List<Semester> allSemesterList = null;
-        //List<Semester> allSemesterList = SemesterServiceIns.getAllSemesters();
+        SemesterServiceIns semesterServiceIns = new SemesterServiceIns();
+        List<Semester> allSemesterList = semesterServiceIns.getAllSemesters();
 
         //TODO:这里semester的值是怎么得到的还不知道（问题还没有解决）
 
         CourseTable getCourseTableElement = new CourseTable();
 
-        int semesterId;
-        long weekth;
+        int semesterId = 0;
+        long weekth = 0;
         for (int i = 0; i < allSemesterList.size(); i++) {
             //开始进行循环
             Date tempDateBefore = allSemesterList.get(i).begin;
@@ -583,8 +696,7 @@ public class StudentServiceIns implements StudentService {
         //day of week 来进行循环操作
         //小班也要起同一个名字
         //还要知道course的名字
-
-
+        
         //现在获取到了周次需要根据周次来找其上的课程
 
         String allCourseTableEntry = "select c2.id_code,s.name,i.ins_id,i.full_name,c.class_begin,c.class_end,c.location,c.day_of_week from std_section\n" +
@@ -608,6 +720,9 @@ public class StudentServiceIns implements StudentService {
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
             preparedStatement = connection.prepareStatement(allCourseTableEntry);
+            preparedStatement.setInt(1,studentId);
+            preparedStatement.setInt(2,semesterId);
+            preparedStatement.setInt(3, (int) weekth);
             resultSet = preparedStatement.executeQuery();
             int judgeWeek = 1;
 
@@ -659,7 +774,7 @@ public class StudentServiceIns implements StudentService {
 //
 //    }
 
-    public boolean check_COURSE_NOT_FOUND(int sectionId){
+    public synchronized boolean check_COURSE_NOT_FOUND(int sectionId){
         PreparedStatement preparedStatement;
         boolean judge = false ;
         try {
@@ -669,15 +784,16 @@ public class StudentServiceIns implements StudentService {
             preparedStatement = connection.prepareStatement(check_if_COURSE_NOT_FOUND);
             preparedStatement.setInt(1, sectionId);
             ResultSet check_if_COURSE_NOT_FOUND_judge = preparedStatement.executeQuery();
+
             while(check_if_COURSE_NOT_FOUND_judge.next()){
                 if (check_if_COURSE_NOT_FOUND_judge.getBoolean(1) == false) {
                     judge = true;
                 }
             }
 
-
             connection.close();
             preparedStatement.close();
+
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -690,7 +806,7 @@ public class StudentServiceIns implements StudentService {
         }
     }
 
-    public boolean check_COURSE_IS_FULL(int sectionId){
+    public synchronized boolean check_COURSE_IS_FULL(int sectionId){
         PreparedStatement preparedStatement;
         boolean judge = false ;
         ResultSet resultSet;
@@ -725,7 +841,7 @@ public class StudentServiceIns implements StudentService {
         }
     }
 
-    public boolean check_ALREADY_ENROLLED(int studentId,int sectionId){
+    public synchronized boolean check_ALREADY_ENROLLED(int studentId,int sectionId){
         PreparedStatement preparedStatement;
         boolean judge = false ;
         try {
@@ -742,8 +858,6 @@ public class StudentServiceIns implements StudentService {
 
                 }
             }
-
-
             connection.close();
             preparedStatement.close();
 
@@ -760,7 +874,7 @@ public class StudentServiceIns implements StudentService {
     }
 
 
-    public boolean check_ALREADY_PASSED(int studentId,int sectionId){
+    public synchronized boolean check_ALREADY_PASSED(int studentId,int sectionId){
         PreparedStatement preparedStatement;
         boolean judge = false ;
         try {
@@ -801,7 +915,7 @@ public class StudentServiceIns implements StudentService {
 
 
     @Override
-    public boolean passedPrerequisitesForCourse(int studentId, String courseId) { //这里的course_id是id_code
+    public synchronized boolean passedPrerequisitesForCourse(int studentId, String courseId) { //这里的course_id是id_code
         //需要由这个courseid得到course对应的编号才行
         int courseId_num = 0;
         String find_courseId_num = "select course_id from course where id_code = ?";
