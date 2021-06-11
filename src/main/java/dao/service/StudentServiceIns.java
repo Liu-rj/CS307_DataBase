@@ -109,48 +109,39 @@ public class StudentServiceIns implements StudentService {
                 "                credit,\n" +
                 "                class_hour,\n" +
                 "                grading,\n" +
-                "                class_id,\n" +
-                "                instructor_id,\n" +
-                "                day_of_week,\n" +
-                "                class_begin,\n" +
-                "                class_end,\n" +
-                "                location,\n" +
-                "                i.full_name,\n" +
                 "                (c.name || '[' || s.name || ']') as search_name\n" +
                 "         from section_semester ss\n" +
                 "                  join section s on s.section_id = ss.section_id\n" +
                 "                  join course c on c.course_id = s.course_id\n" +
-                "                  join class c2 on s.section_id = c2.section_id\n" +
-                "                  join instructor i on c2.instructor_id = i.ins_id\n" +
                 "         where ss.semester_id = ?\n" +
                 "     ) a\n" +
                 "order by (a.course_id, search_name);";
 
-        String selAllSection = "select * from (\n" +
-                "                  select s.section_id,\n" +
-                "                         s.course_id,\n" +
-                "                         s.name as section,\n" +
-                "                         total_capacity,\n" +
-                "                         left_capacity,\n" +
-                "                         id_code,\n" +
-                "                         c.name as course,\n" +
-                "                         credit,\n" +
-                "                         class_hour,\n" +
-                "                         grading,\n" +
-                "                         class_id,\n" +
-                "                         instructor_id,\n" +
-                "                         day_of_week,\n" +
-                "                         class_begin,\n" +
-                "                         class_end,\n" +
-                "                         location,\n" +
-                "                         i.full_name,\n" +
-                "                         (c.name || '[' || s.name || ']') as search_name\n" +
-                "                  from section s\n" +
-                "                           join course c on c.course_id = s.course_id\n" +
-                "                           join class c2 on s.section_id = c2.section_id\n" +
-                "                           join instructor i on c2.instructor_id = i.ins_id\n" +
-                "              ) a\n" +
+        String selAllSection = "select *\n" +
+                "from (\n" +
+                "         select s.section_id,\n" +
+                "                s.course_id,\n" +
+                "                s.name                           as section,\n" +
+                "                total_capacity,\n" +
+                "                left_capacity,\n" +
+                "                id_code,\n" +
+                "                c.name                           as course,\n" +
+                "                credit,\n" +
+                "                class_hour,\n" +
+                "                grading,\n" +
+                "                (c.name || '[' || s.name || ']') as search_name\n" +
+                "         from section s\n" +
+                "                  join course c on c.course_id = s.course_id\n" +
+                "     ) a\n" +
                 "order by search_name;";
+
+        String selSelected = "select (c.name || '[' || s2.name || ']') as search_name\n" +
+                "from section_semester ss\n" +
+                "         join std_section s on ss.section_id = s.section_id\n" +
+                "         join section s2 on s2.section_id = s.section_id\n" +
+                "         join course c on c.course_id = s2.course_id\n" +
+                "where semester_id = ?\n" +
+                "and std_id = 1;";
 
         List<CourseSearchEntry> allCourses = new ArrayList<>();
         List<CourseSearchEntry> totalEntries = new ArrayList<>();
@@ -158,112 +149,70 @@ public class StudentServiceIns implements StudentService {
         ResultSet resultSet;
         CourseService courseService = new CourseServiceIns();
         try {
-
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // execute sel
             preparedStatement = connection.prepareStatement(selAll);
             preparedStatement.setInt(1, semesterId);
             resultSet = preparedStatement.executeQuery();
-            CourseSection section = new CourseSection();
-            Set<CourseSectionClass> sectionClasses = new HashSet<>();
+            CourseSection section;
             while (resultSet.next()) {
-                if (resultSet.getInt("section_id") == section.id) {
-                    CourseSectionClass cls = new CourseSectionClass();
-                    cls.id = resultSet.getInt("class_id");
-                    cls.instructor = new Instructor();
-                    cls.instructor.id = resultSet.getInt("instructor_id");
-                    cls.instructor.fullName = resultSet.getString("full_name");
-                    cls.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
-                    cls.classBegin = (short) resultSet.getInt("class_begin");
-                    cls.classEnd = (short) resultSet.getInt("class_end");
-                    cls.location = resultSet.getString("location");
-                    sectionClasses.add(cls);
-                } else {
-                    CourseSearchEntry entry = new CourseSearchEntry();
+                CourseSearchEntry entry = new CourseSearchEntry();
 
-                    Course course = new Course();
-                    course.id = resultSet.getString("id_code");
-                    course.name = resultSet.getString("course");
-                    course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
-                    course.credit = resultSet.getInt("credit");
-                    course.classHour = resultSet.getInt("class_hour");
-                    entry.course = course;
+                Course course = new Course();
+                course.id = resultSet.getString("id_code");
+                course.name = resultSet.getString("course");
+                course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+                course.credit = resultSet.getInt("credit");
+                course.classHour = resultSet.getInt("class_hour");
+                entry.course = course;
 
-                    section = new CourseSection();
-                    section.id = resultSet.getInt("section_id");
-                    section.name = resultSet.getString("section");
-                    section.totalCapacity = resultSet.getInt("total_capacity");
-                    section.leftCapacity = resultSet.getInt("left_capacity");
-                    entry.section = section;
+                section = new CourseSection();
+                section.id = resultSet.getInt("section_id");
+                section.name = resultSet.getString("section");
+                section.totalCapacity = resultSet.getInt("total_capacity");
+                section.leftCapacity = resultSet.getInt("left_capacity");
+                entry.section = section;
 
-                    sectionClasses = new HashSet<>();
-                    CourseSectionClass cls = new CourseSectionClass();
-                    cls.id = resultSet.getInt("class_id");
-                    cls.instructor = new Instructor();
-                    cls.instructor.id = resultSet.getInt("instructor_id");
-                    cls.instructor.fullName = resultSet.getString("full_name");
-                    cls.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
-                    cls.classBegin = (short) resultSet.getInt("class_begin");
-                    cls.classEnd = (short) resultSet.getInt("class_end");
-                    cls.location = resultSet.getString("location");
-                    sectionClasses.add(cls);
-                    entry.sectionClasses = sectionClasses;
+                entry.sectionClasses = new HashSet<>();
+                entry.sectionClasses.addAll(courseService.getCourseSectionClasses(section.id));
 
-                    totalEntries.add(entry);
-                }
+                totalEntries.add(entry);
             }
 
             // execute sel
             preparedStatement = connection.prepareStatement(selAllSection);
             resultSet = preparedStatement.executeQuery();
-            section = new CourseSection();
-            sectionClasses = new HashSet<>();
             while (resultSet.next()) {
-                if (resultSet.getInt("section_id") == section.id) {
-                    CourseSectionClass cls = new CourseSectionClass();
-                    cls.id = resultSet.getInt("class_id");
-                    cls.instructor = new Instructor();
-                    cls.instructor.id = resultSet.getInt("instructor_id");
-                    cls.instructor.fullName = resultSet.getString("full_name");
-                    cls.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
-                    cls.classBegin = (short) resultSet.getInt("class_begin");
-                    cls.classEnd = (short) resultSet.getInt("class_end");
-                    cls.location = resultSet.getString("location");
-                    sectionClasses.add(cls);
-                } else {
-                    CourseSearchEntry entry = new CourseSearchEntry();
+                CourseSearchEntry entry = new CourseSearchEntry();
 
-                    Course course = new Course();
-                    course.id = resultSet.getString("id_code");
-                    course.name = resultSet.getString("course");
-                    course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
-                    course.credit = resultSet.getInt("credit");
-                    course.classHour = resultSet.getInt("class_hour");
-                    entry.course = course;
+                Course course = new Course();
+                course.id = resultSet.getString("id_code");
+                course.name = resultSet.getString("course");
+                course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+                course.credit = resultSet.getInt("credit");
+                course.classHour = resultSet.getInt("class_hour");
+                entry.course = course;
 
-                    section = new CourseSection();
-                    section.id = resultSet.getInt("section_id");
-                    section.name = resultSet.getString("section");
-                    section.totalCapacity = resultSet.getInt("total_capacity");
-                    section.leftCapacity = resultSet.getInt("left_capacity");
-                    entry.section = section;
+                section = new CourseSection();
+                section.id = resultSet.getInt("section_id");
+                section.name = resultSet.getString("section");
+                section.totalCapacity = resultSet.getInt("total_capacity");
+                section.leftCapacity = resultSet.getInt("left_capacity");
+                entry.section = section;
 
-                    sectionClasses = new HashSet<>();
-                    CourseSectionClass cls = new CourseSectionClass();
-                    cls.id = resultSet.getInt("class_id");
-                    cls.instructor = new Instructor();
-                    cls.instructor.id = resultSet.getInt("instructor_id");
-                    cls.instructor.fullName = resultSet.getString("full_name");
-                    cls.dayOfWeek = DayOfWeek.of(resultSet.getInt("day_of_week"));
-                    cls.classBegin = (short) resultSet.getInt("class_begin");
-                    cls.classEnd = (short) resultSet.getInt("class_end");
-                    cls.location = resultSet.getString("location");
-                    sectionClasses.add(cls);
-                    entry.sectionClasses = sectionClasses;
+                entry.sectionClasses = new HashSet<>();
+                entry.sectionClasses.addAll(courseService.getCourseSectionClasses(section.id));
 
-                    allCourses.add(entry);
-                }
+                allCourses.add(entry);
+            }
+
+            preparedStatement = connection.prepareStatement(selSelected);
+            preparedStatement.setInt(1, semesterId);
+            resultSet = preparedStatement.executeQuery();
+            List<String> selectedCourses = new ArrayList<>();
+            while (resultSet.next()) {
+                selectedCourses.add(resultSet.getString("search_name"));
             }
 
             // close connection
@@ -343,39 +292,45 @@ public class StudentServiceIns implements StudentService {
                 totalEntries.removeIf(e -> !passedPrerequisitesForCourse(studentId, e.course.id));
             }
 
-//            for (CourseSearchEntry e : totalEntries) {
-//                List<String> conflict = new ArrayList<>();
-//                for (CourseSearchEntry target : allCourses) {
-//                    if (e.course.id.equals(target.course.id)) {
-//                        conflict.add(target.course.name + '[' + target.section.name + ']');
-//                    } else {
-//                        for (CourseSectionClass cls : e.sectionClasses) {
-//                            for (CourseSectionClass clsTarget : target.sectionClasses) {
-//                                for (Short week : cls.weekList) {
-//                                    for (Short targetWeek : clsTarget.weekList) {
-//                                        if (week.equals(targetWeek)) {
-//                                            if (cls.dayOfWeek.equals(clsTarget.dayOfWeek)) {
-//                                                if ((cls.classBegin >= clsTarget.classBegin && cls.classBegin <= clsTarget.classEnd)
-//                                                        || (cls.classEnd >= clsTarget.classBegin && cls.classEnd <= clsTarget.classEnd)
-//                                                        || (clsTarget.classBegin >= cls.classBegin && clsTarget.classBegin <= cls.classEnd)
-//                                                        || (clsTarget.classEnd >= cls.classBegin && clsTarget.classEnd <= cls.classEnd)) {
-//                                                    conflict.add(target.course.name + '[' + target.section.name + ']');
-//                                                }
-//                                            }
-//                                        }
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//                e.conflictCourseNames = conflict;
-//            }
+            for (CourseSearchEntry e : totalEntries) {
+                List<String> conflict = new ArrayList<>();
+                for (CourseSearchEntry target : allCourses) {
+                    if (e.course.id.equals(target.course.id)) {
+                        conflict.add(target.course.name + '[' + target.section.name + ']');
+                    } else {
+                        for (CourseSectionClass cls : e.sectionClasses) {
+                            for (CourseSectionClass clsTarget : target.sectionClasses) {
+                                for (Short week : cls.weekList) {
+                                    for (Short targetWeek : clsTarget.weekList) {
+                                        if (week.equals(targetWeek)) {
+                                            if (cls.dayOfWeek.equals(clsTarget.dayOfWeek)) {
+                                                if ((cls.classBegin >= clsTarget.classBegin && cls.classBegin <= clsTarget.classEnd)
+                                                        || (cls.classEnd >= clsTarget.classBegin && cls.classEnd <= clsTarget.classEnd)
+                                                        || (clsTarget.classBegin >= cls.classBegin && clsTarget.classBegin <= cls.classEnd)
+                                                        || (clsTarget.classEnd >= cls.classBegin && clsTarget.classEnd <= cls.classEnd)) {
+                                                    conflict.add(target.course.name + '[' + target.section.name + ']');
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                e.conflictCourseNames = conflict;
+            }
 
-            // TODO:
-//            if (ignoreConflict) {
-//                totalEntries.removeIf(e -> );
-//            }
+            temp = new ArrayList<>();
+            for (CourseSearchEntry e : totalEntries) {
+                for (String s : selectedCourses) {
+                    if (e.conflictCourseNames.contains(s)) {
+                        temp.add(e);
+                        break;
+                    }
+                }
+            }
+            totalEntries.removeAll(temp);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -388,21 +343,17 @@ public class StudentServiceIns implements StudentService {
         String insertStudent = "insert into std_section values(?,?,null,null);";
         //COURSE_NOT_FOUND
         try {
-
             boolean if_COURSE_NOT_FOUND = check_COURSE_NOT_FOUND(sectionId);
-            if(if_COURSE_NOT_FOUND == true){
+            if(if_COURSE_NOT_FOUND){
                 return  EnrollResult.COURSE_NOT_FOUND;
             }
-            boolean if_COURSE_IS_FULL = check_COURSE_IS_FULL(sectionId);
-            if(if_COURSE_IS_FULL == true){
-                return EnrollResult.COURSE_IS_FULL;
-            }
+
             boolean if_ALREADY_ENROLLED = check_ALREADY_ENROLLED(studentId,sectionId);
-            if(if_ALREADY_ENROLLED == true){
+            if(if_ALREADY_ENROLLED){
                 return EnrollResult.ALREADY_ENROLLED;
             }
             boolean if_ALREADY_PASSED = check_ALREADY_PASSED(studentId,sectionId);
-            if(if_ALREADY_PASSED == true){
+            if(if_ALREADY_PASSED){
                 return EnrollResult.ALREADY_PASSED;
             }
 
@@ -425,8 +376,18 @@ public class StudentServiceIns implements StudentService {
 
 
             boolean if_PREREQUISITES_NOT_FULFILLED = passedPrerequisitesForCourse(studentId,courseId);
-            if(if_PREREQUISITES_NOT_FULFILLED == false){
+            if(!if_PREREQUISITES_NOT_FULFILLED){
                 return EnrollResult.PREREQUISITES_NOT_FULFILLED;
+            }
+
+            boolean if_COURSE_CONFLICT_FOUND = check_COURSE_CONFLICT_FOUND(studentId, sectionId);
+            if(if_COURSE_CONFLICT_FOUND){
+                return EnrollResult.COURSE_CONFLICT_FOUND;
+            }
+
+            boolean if_COURSE_IS_FULL = check_COURSE_IS_FULL(sectionId);
+            if(if_COURSE_IS_FULL){
+                return EnrollResult.COURSE_IS_FULL;
             }
 
             //TODO:不知道这样子改写是不是对的
@@ -455,23 +416,49 @@ public class StudentServiceIns implements StudentService {
     public void dropCourse(int studentId, int sectionId) throws IllegalStateException {
         //TODO：这里的try catch具体怎么完成需要理解
         //从学生已经选择的课程中删去一门课，如果这门课已经有成绩了，那么不能删除，需要抛出异常
-        String sql = "delete from std_section where std_id = ? and section_id = ?";
+        String check = "select ((select score from std_section where std_id = ? and section_id = ?) is null);";
+        String sql = "delete from std_section where std_id = ? and section_id = ? and score is null";
         PreparedStatement preparedStatement;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
-            // add to course table not handling pre
-            preparedStatement = connection.prepareStatement(sql);
+            preparedStatement = connection.prepareStatement(check);
             preparedStatement.setInt(1, studentId);
             preparedStatement.setInt(2, sectionId);
-            preparedStatement.execute();
-
-            // close connection
+            ResultSet resultSet;
+            resultSet = preparedStatement.executeQuery();
+            boolean judgeCheck = false;
+            while(resultSet.next()){
+                judgeCheck = resultSet.getBoolean(1);
+            }
             connection.close();
             preparedStatement.close();
+
+
+
+
+            if(!judgeCheck){
+                //说明其不为空
+                throw new IllegalStateException();
+            }
+            else{
+                Connection connection2 = SQLDataSource.getInstance().getSQLConnection();
+                PreparedStatement preparedStatement2;
+                // add to course table not handling pre
+                preparedStatement2 = connection2.prepareStatement(sql);
+                preparedStatement2.setInt(1, studentId);
+                preparedStatement2.setInt(2, sectionId);
+                preparedStatement2.execute();
+
+                // close connection
+                connection2.close();
+                preparedStatement2.close();
+            }
+
+
         } catch (SQLException e) {
             //这里的异常怎么抛出需要理解
-            throw new IllegalStateException();
+            e.printStackTrace();
         }
 
 
@@ -545,28 +532,23 @@ public class StudentServiceIns implements StudentService {
             boolean gradeType;
 
 
-            if(grade == null){
-                preparedStatement.setObject(3,null);
-                preparedStatement.setObject(4,null);
-            }else{
-                if (grade instanceof HundredMarkGrade) {
-                    HundredMarkGrade temp = (HundredMarkGrade) grade;
-                    gradeScore = temp.mark;
-                    gradeType = true;
+            if (grade instanceof HundredMarkGrade) {
+                HundredMarkGrade temp = (HundredMarkGrade) grade;
+                gradeScore = temp.mark;
+                gradeType = true;
+            } else {
+                PassOrFailGrade temp = (PassOrFailGrade) grade;
+                if (temp.equals(PassOrFailGrade.PASS)) {
+                    gradeScore = 1;
+                    gradeType = false;
                 } else {
-                    PassOrFailGrade temp = (PassOrFailGrade) grade;
-                    if (temp.equals(PassOrFailGrade.PASS)) {
-                        gradeScore = 1;
-                        gradeType = false;
-                    } else {
-                        gradeScore = 0;
-                        gradeType = false;
-                    }
+                    gradeScore = 0;
+                    gradeType = false;
                 }
-
-                preparedStatement.setInt(3, gradeScore);
-                preparedStatement.setBoolean(4, gradeType);
             }
+
+            preparedStatement.setInt(3, gradeScore);
+            preparedStatement.setBoolean(4, gradeType);
 
             preparedStatement.execute();
 
@@ -669,20 +651,20 @@ public class StudentServiceIns implements StudentService {
 
         int semesterId = 0;
         long weekth = 0;
-        for (int i = 0; i < allSemesterList.size(); i++) {
+        for (Semester semester : allSemesterList) {
             //开始进行循环
-            Date tempDateBefore = allSemesterList.get(i).begin;
+            Date tempDateBefore = semester.begin;
             int beforeCompare = tempDateBefore.compareTo(date);
-            Date tempDateEnd = allSemesterList.get(i).end;
+            Date tempDateEnd = semester.end;
             int afterCompare = tempDateEnd.compareTo(date);
             if (beforeCompare >= 0 && afterCompare <= 0) {
                 //说明传入的日期在这两个学期中间
                 //需要返回整个周次的课程表
                 //需要知道当前是哪个学期和相应的周次信息
                 //这个date的值直接会告诉是那一天
-                semesterId = allSemesterList.get(i).id; //得到有关周次的相关信息
+                semesterId = semester.id; //得到有关周次的相关信息
 
-                long timeDis = Math.abs(date.getTime() - allSemesterList.get(i).begin.getTime());//获取到天数，然后利用天数来计算周次
+                long timeDis = Math.abs(date.getTime() - semester.begin.getTime());//获取到天数，然后利用天数来计算周次
                 long day = timeDis / (1000 * 60 * 60 * 24);
                 weekth = (day / 7) + 1; //weekth表示当前的周次是第几周
                 //TODO:这里的计算可能出现问题
@@ -769,11 +751,6 @@ public class StudentServiceIns implements StudentService {
         return courseTableResult;
     }
 
-    // TODO:
-//    public boolean check_COURSE_CONFLICT(int studentId, int semester, int sectionId) {
-//
-//    }
-
     public synchronized boolean check_COURSE_NOT_FOUND(int sectionId){
         PreparedStatement preparedStatement;
         boolean judge = false ;
@@ -786,7 +763,7 @@ public class StudentServiceIns implements StudentService {
             ResultSet check_if_COURSE_NOT_FOUND_judge = preparedStatement.executeQuery();
 
             while(check_if_COURSE_NOT_FOUND_judge.next()){
-                if (check_if_COURSE_NOT_FOUND_judge.getBoolean(1) == false) {
+                if (!check_if_COURSE_NOT_FOUND_judge.getBoolean(1)) {
                     judge = true;
                 }
             }
@@ -798,12 +775,7 @@ public class StudentServiceIns implements StudentService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        if(judge == true){
-            return true;     //return EnrollResult.COURSE_NOT_FOUND;
-        }
-        else{
-            return false;
-        }
+        return judge;     //return EnrollResult.COURSE_NOT_FOUND;
     }
 
     public synchronized boolean check_COURSE_IS_FULL(int sectionId){
@@ -821,11 +793,7 @@ public class StudentServiceIns implements StudentService {
             while(resultSet.next()){
                 left_capacity =  resultSet.getInt(1);
             }
-            if(left_capacity == 0){
-                judge = true;
-            }else{
-                judge = false;
-            }
+            judge = left_capacity == 0;
 
             connection.close();
             preparedStatement.close();
@@ -833,12 +801,7 @@ public class StudentServiceIns implements StudentService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        if(judge == true){
-            return true;     //return EnrollResult.COURSE_IS_FULL;
-        }
-        else{
-            return false;
-        }
+        return judge;     //return EnrollResult.COURSE_IS_FULL;
     }
 
     public synchronized boolean check_ALREADY_ENROLLED(int studentId,int sectionId){
@@ -865,12 +828,7 @@ public class StudentServiceIns implements StudentService {
             e.printStackTrace();
         }
 
-        if(judge == true){
-            return true;     //return EnrollResult.ALREADY_ENROLLED;
-        }
-        else{
-            return false;
-        }
+        return judge;     //return EnrollResult.ALREADY_ENROLLED;
     }
 
 
@@ -886,7 +844,7 @@ public class StudentServiceIns implements StudentService {
             ResultSet check_if_ALREADY_PASSED_judge = preparedStatement.executeQuery();
             while (check_if_ALREADY_PASSED_judge.next()) {
                 if (check_if_ALREADY_PASSED_judge.getObject(1) != null && check_if_ALREADY_PASSED_judge.getObject(4) != null) {
-                    if (check_if_ALREADY_PASSED_judge.getBoolean(4) == false) {//表示通过、不通过
+                    if (!check_if_ALREADY_PASSED_judge.getBoolean(4)) {//表示通过、不通过
                         if (check_if_ALREADY_PASSED_judge.getInt(3) == 1) {
                             judge = true;
                         }
@@ -904,12 +862,7 @@ public class StudentServiceIns implements StudentService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        if(judge == true){
-            return true;     //false表示这门课并不存在 return EnrollResult.ALREADY_PASSED;
-        }
-        else{
-            return false;
-        }
+        return judge;     //false表示这门课并不存在 return EnrollResult.ALREADY_PASSED;
     }
 
 
@@ -992,11 +945,106 @@ public class StudentServiceIns implements StudentService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        if (if_satisfy_pre == 0) { //等于0说明循环下来没有满足先修关系的课程
-            return false;
-        } else {
-            return true;
+        //等于0说明循环下来没有满足先修关系的课程
+        return if_satisfy_pre != 0;
+    }
+
+    public synchronized boolean check_COURSE_CONFLICT_FOUND(int studentId, int sectionId){
+        String selSelected = "select s.section_id,\n" +
+                "       c.course_id,\n" +
+                "       s2.name                           as section,\n" +
+                "       total_capacity,\n" +
+                "       left_capacity,\n" +
+                "       id_code,\n" +
+                "       c.name                           as course,\n" +
+                "       credit,\n" +
+                "       class_hour,\n" +
+                "       grading,\n" +
+                "       (c.name || '[' || s2.name || ']') as search_name\n" +
+                "from section_semester ss\n" +
+                "         join std_section s on ss.section_id = s.section_id\n" +
+                "         join section s2 on s2.section_id = s.section_id\n" +
+                "         join course c on c.course_id = s2.course_id\n" +
+                "where std_id = ?\n" +
+                "  and semester_id = (\n" +
+                "    select semester_id\n" +
+                "    from section_semester\n" +
+                "    where section_id = ?);";
+
+        PreparedStatement preparedStatement;
+        ResultSet resultSet;
+        boolean conflict = false;
+        try {
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+
+            CourseService courseService = new CourseServiceIns();
+
+            preparedStatement = connection.prepareStatement(selSelected);
+            preparedStatement.setInt(1, studentId);
+            preparedStatement.setInt(2, sectionId);
+            resultSet = preparedStatement.executeQuery();
+            CourseSection section;
+            List<CourseSearchEntry> searchEntries = new ArrayList<>();
+            while (resultSet.next()) {
+                CourseSearchEntry entry = new CourseSearchEntry();
+
+                Course course = new Course();
+                course.id = resultSet.getString("id_code");
+                course.name = resultSet.getString("course");
+                course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+                course.credit = resultSet.getInt("credit");
+                course.classHour = resultSet.getInt("class_hour");
+                entry.course = course;
+
+                section = new CourseSection();
+                section.id = resultSet.getInt("section_id");
+                section.name = resultSet.getString("section");
+                section.totalCapacity = resultSet.getInt("total_capacity");
+                section.leftCapacity = resultSet.getInt("left_capacity");
+                entry.section = section;
+
+                entry.sectionClasses = new HashSet<>();
+                entry.sectionClasses.addAll(courseService.getCourseSectionClasses(section.id));
+
+                searchEntries.add(entry);
+            }
+            preparedStatement.close();
+            connection.close();
+
+            CourseSearchEntry self = new CourseSearchEntry();
+            self.course = courseService.getCourseBySection(sectionId);
+            self.sectionClasses = new HashSet<>();
+            self.sectionClasses.addAll(courseService.getCourseSectionClasses(sectionId));
+
+            for (CourseSearchEntry e : searchEntries) {
+                if (e.section.id == sectionId) {
+                    conflict = true;
+                    break;
+                } else {
+                    for (CourseSectionClass cls : e.sectionClasses) {
+                        for (CourseSectionClass clsTarget : self.sectionClasses) {
+                            for (Short week : cls.weekList) {
+                                for (Short targetWeek : clsTarget.weekList) {
+                                    if (week.equals(targetWeek)) {
+                                        if (cls.dayOfWeek.equals(clsTarget.dayOfWeek)) {
+                                            if ((cls.classBegin >= clsTarget.classBegin && cls.classBegin <= clsTarget.classEnd)
+                                                    || (cls.classEnd >= clsTarget.classBegin && cls.classEnd <= clsTarget.classEnd)
+                                                    || (clsTarget.classBegin >= cls.classBegin && clsTarget.classBegin <= cls.classEnd)
+                                                    || (clsTarget.classEnd >= cls.classBegin && clsTarget.classEnd <= cls.classEnd)) {
+                                                conflict = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+        return conflict;
     }
 
     @Override

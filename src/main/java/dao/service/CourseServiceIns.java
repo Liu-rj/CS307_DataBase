@@ -387,17 +387,22 @@ public class CourseServiceIns implements CourseService {
             preparedStatement = connection.prepareStatement(selCourse);
             preparedStatement.setInt(1, sectionId);
             resultSet = preparedStatement.executeQuery();
-            int courseId = resultSet.getInt(1);
+            int courseId = 0;
+            while (resultSet.next()) {
+                courseId = resultSet.getInt(1);
+            }
 
             // get course info according to queried courseId
             preparedStatement = connection.prepareStatement(courseInfo);
             preparedStatement.setInt(1, courseId);
             resultSet = preparedStatement.executeQuery();
-            course.id = resultSet.getString("id");
-            course.name = resultSet.getString("name");
-            course.credit = resultSet.getInt("credit");
-            course.classHour = resultSet.getInt("class_hour");
-            course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+            while (resultSet.next()) {
+                course.id = resultSet.getString("id_code");
+                course.name = resultSet.getString("name");
+                course.credit = resultSet.getInt("credit");
+                course.classHour = resultSet.getInt("class_hour");
+                course.grading = Course.CourseGrading.values()[resultSet.getBoolean("grading") ? 1 : 0];
+            }
 
             // close connection
             connection.close();
