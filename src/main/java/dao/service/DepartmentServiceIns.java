@@ -95,9 +95,12 @@ public class DepartmentServiceIns implements DepartmentService {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setInt(1, departmentId);
             resultSet = preparedStatement.executeQuery();
-            getDepartment.id = resultSet.getInt(1);
-            getDepartment.name = resultSet.getString(2);
+            while (resultSet.next()) {
+                getDepartment.id = resultSet.getInt(1);
+                getDepartment.name = resultSet.getString(2);
+            }
 
             connection.close();
             preparedStatement.close();

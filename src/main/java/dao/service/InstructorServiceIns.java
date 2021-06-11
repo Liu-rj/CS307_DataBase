@@ -17,13 +17,19 @@ public class InstructorServiceIns implements InstructorService{
         String sql = "insert into instructor values (?, ?);";
         PreparedStatement preparedStatement;
         try {
+            String fullName;
+            if (firstName.charAt(0) > 'z') {
+                fullName = firstName + lastName;
+            } else {
+                fullName = firstName + " " + lastName;
+            }
+
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // add to course table not handling pre
             preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setInt(1, userId);
-            // TODO: change instructor's full name to correct format
-            preparedStatement.setString(2, firstName + " " + lastName);
+            preparedStatement.setString(2, fullName);
             preparedStatement.execute();
 
             // close connection

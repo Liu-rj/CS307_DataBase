@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 
-
 public final class ProjectJudge {
     private static final File searchCourse1Dir = new File("./data/searchCourse1/");
     private static final File enrollCourse1Dir = new File("./data/enrollCourse1/");
@@ -53,6 +52,26 @@ public final class ProjectJudge {
                     .mapToObj(it -> testSearchCourse(searchCourseParams.get(it)))
                     .collect(Collectors.toUnmodifiableList());
             result.elapsedTimeNs.addAndGet(System.nanoTime() - beforeTime);
+
+            /*for (int i = 0; i < searchCourseExpected.size(); i++) {
+                if (!searchCourseExpected.get(i).equals(searchCourseResult.get(i))) {
+                    List<CourseSearchEntry> expect = searchCourseExpected.get(i);
+                    List<CourseSearchEntry> actual = searchCourseResult.get(i);
+                   *//* if (expect.size() != actual.size()) {
+                        System.out.println();
+                    }*//*
+                    for (int j = 0; j < expect.size(); j++) {
+                        if (!expect.get(j).equals(actual.get(j))) {
+                            CourseSearchEntry ex = expect.get(j);
+                            CourseSearchEntry ac = actual.get(j);
+                            System.out.println();
+                        }
+                    }
+                    testSearchCourse(searchCourseParams.get(i));
+                    System.out.println();
+                }
+            }*/
+
             result.passCount.addAndGet(IntStream.range(0, searchCourseParams.size()).parallel()
                     .filter(it -> searchCourseExpected.get(it).equals(searchCourseResult.get(it))).count());
         }
@@ -99,6 +118,9 @@ public final class ProjectJudge {
                 if (expected == result) {
                     evalResult.passCount.incrementAndGet();
                 }
+                else {
+                    testEnrollCourse(enrollCourseParams.get(i));
+                }
                 if (expected == StudentService.EnrollResult.SUCCESS) {
                     evalResult.succeedSections.add(enrollCourseParams.get(i));
                 }
@@ -142,6 +164,21 @@ public final class ProjectJudge {
                     .mapToObj(it -> testCourseTable(courseTableParams.get(it)))
                     .collect(Collectors.toUnmodifiableList());
             result.elapsedTimeNs.addAndGet(System.nanoTime() - beforeTime);
+
+     /*       for (int i = 0; i < courseTableExpected.size(); i++) {
+                if (!courseTableExpected.get(i).equals(courseTableResults.get(i))) {
+                    CourseTable expect = courseTableExpected.get(i);
+                    CourseTable actual = courseTableResults.get(i);
+                    for (int j = 0; j < 7; j++) {
+                        Set<CourseTable.CourseTableEntry> ex = expect.table.get(DayOfWeek.of(j + 1));
+                        Set<CourseTable.CourseTableEntry> ac = actual.table.get(DayOfWeek.of(j + 1));
+                        if (!ex.equals(ac)) {
+                            System.out.println();
+                        }
+                    }
+                }
+            }
+*/
             result.passCount.addAndGet(IntStream.range(0, courseTableParams.size()).parallel()
                     .filter(it -> courseTableExpected.get(it).equals(courseTableResults.get(it))).count());
         }
