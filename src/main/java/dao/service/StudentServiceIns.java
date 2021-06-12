@@ -325,69 +325,6 @@ public class StudentServiceIns implements StudentService {
                 }
             }
             totalEntries = tempTest;
-/*
-
-            List<CourseSearchEntry> temp = new ArrayList<>();
-            if (searchInstructor != null) {
-                for (CourseSearchEntry e : totalEntries) {
-                    for (CourseSectionClass cls : e.sectionClasses) {
-                        if (cls.instructor.fullName.contains(searchInstructor) || cls.instructor.fullName.replace(" ", "").contains(searchInstructor)) {
-                            temp.add(e);
-                            break;
-                        }
-                    }
-                }
-                totalEntries = temp;
-            }
-
-
-            temp = new ArrayList<>();
-            if (searchDayOfWeek != null) {
-                for (CourseSearchEntry e : totalEntries) {
-                    for (CourseSectionClass cls : e.sectionClasses) {
-                        if (searchDayOfWeek.equals(cls.dayOfWeek)) {
-                            temp.add(e);
-                            break;
-                        }
-                    }
-                }
-                totalEntries = temp;
-            }
-
-            temp = new ArrayList<>();
-            if (searchClassTime != null) {
-                for (CourseSearchEntry e : totalEntries) {
-                    for (CourseSectionClass cls : e.sectionClasses) {
-                        if (cls.classBegin <= searchClassTime && cls.classEnd >= searchClassTime && (searchDayOfWeek == null || searchDayOfWeek.equals(cls.dayOfWeek))) {
-                            temp.add(e);
-                            break;
-                        }
-                    }
-                }
-                totalEntries = temp;
-            }
-
-            temp = new ArrayList<>();
-            boolean flag = false;
-            if (searchClassLocations != null) {
-                for (CourseSearchEntry e : totalEntries) {
-                    for (CourseSectionClass cls : e.sectionClasses) {
-                        for (String location : searchClassLocations) {
-                            if (cls.location.contains(location)) {
-                                temp.add(e);
-                                flag = true;
-                                break;
-                            }
-                        }
-                        if (flag) {
-                            flag = false;
-                            break;
-                        }
-                    }
-                }
-                totalEntries = temp;
-            }
-*/
 
             if (ignoreFull) {
                 totalEntries.removeIf(e -> e.section.leftCapacity == 0);
@@ -407,7 +344,6 @@ public class StudentServiceIns implements StudentService {
                     if (e.course.id.equals(target.course.id)) {
                         conflict.add(target.course.name + '[' + target.section.name + ']');
                     } else {
-
                         for (CourseSectionClass cls : e.sectionClasses) {
                             for (CourseSectionClass clsTarget : target.sectionClasses) {
                                 for (Short week : cls.weekList) {
@@ -435,13 +371,13 @@ public class StudentServiceIns implements StudentService {
                 totalEntries.removeIf(e -> e.conflictCourseNames.size() != 0);
             }
 
-            totalEntries.sort((o1, o2) -> {
-                if (o1.course.id.compareTo(o2.course.id) == 0) {
-                    return (o1.course.name + "[" + o1.section.name + "]").compareTo(o2.course.name + "[" + o2.section.name + "]");
-                } else {
-                    return o1.course.id.compareTo(o2.course.id);
-                }
-            });
+//            totalEntries.sort((o1, o2) -> {
+//                if (o1.course.id.compareTo(o2.course.id) == 0) {
+//                    return (o1.course.name + "[" + o1.section.name + "]").compareTo(o2.course.name + "[" + o2.section.name + "]");
+//                } else {
+//                    return o1.course.id.compareTo(o2.course.id);
+//                }
+//            });
 
             totalEntries = totalEntries.subList(Math.min(pageSize * pageIndex, totalEntries.size()), Math.min((pageIndex + 1) * pageSize, totalEntries.size()));
         } catch (SQLException e) {
@@ -503,7 +439,6 @@ public class StudentServiceIns implements StudentService {
                 return EnrollResult.COURSE_IS_FULL;
             }
 
-            //TODO:不知道这样子改写是不是对的
             Connection connection2 = SQLDataSource.getInstance().getSQLConnection();
             PreparedStatement preparedStatement2;
 
@@ -533,7 +468,6 @@ public class StudentServiceIns implements StudentService {
 
     @Override
     public void dropCourse(int studentId, int sectionId) throws IllegalStateException {
-        //TODO：这里的try catch具体怎么完成需要理解
         //从学生已经选择的课程中删去一门课，如果这门课已经有成绩了，那么不能删除，需要抛出异常
         String check = "select ((select score from std_section where std_id = ? and section_id = ?) is null);";
         String sql = "delete from std_section where std_id = ? and section_id = ? and score is null";
@@ -940,28 +874,25 @@ public class StudentServiceIns implements StudentService {
         boolean judge = false;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
-            String check_if_ALREADY_PASSED = "select std_section.std_id,std_section.section_id,std_section.score,std_section.type from std_section where std_id = ? and section_id = ?";
+            String check_if_ALREADY_PASSED = "select score, type\n" +
+                    "from std_section ss\n" +
+                    "         join section s on s.section_id = ss.section_id\n" +
+                    "where std_id = ?\n" +
+                    "  and course_id = (select course_id from section a where a.section_id = ?);";
             preparedStatement = connection.prepareStatement(check_if_ALREADY_PASSED);
             preparedStatement.setInt(1, studentId);
             preparedStatement.setInt(2, sectionId);
-            ResultSet check_if_ALREADY_PASSED_judge = preparedStatement.executeQuery();
-            while (check_if_ALREADY_PASSED_judge.next()) {
-                if (check_if_ALREADY_PASSED_judge.getObject(1) != null && check_if_ALREADY_PASSED_judge.getObject(4) != null) {
-                    if (!check_if_ALREADY_PASSED_judge.getBoolean(4)) {//表示通过、不通过
-                        if (check_if_ALREADY_PASSED_judge.getInt(3) == 1) {
-                            judge = true;
-                        }
-                    } else {
-                        if (check_if_ALREADY_PASSED_judge.getInt(3) >= 60) {
-                            judge = true;
-                        }
-                    }
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                int score = resultSet.getInt("score");
+                boolean type = resultSet.getBoolean("type");
+                if ((type && score >= 60) || (!type && score == 1)) {
+                    judge = true;
                 }
             }
 
             connection.close();
             preparedStatement.close();
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1003,7 +934,7 @@ public class StudentServiceIns implements StudentService {
 
 
             for (int i = 1; i <= PREREQUISITES_group_count; i++) {
-                int count_paseed_course = 0;//检查每组先修组合下面已经通过的课程数量
+                int count_passed_course = 0;//检查每组先修组合下面已经通过的课程数量
                 String PREREQUISITES_small_group_number = "select count(*) from prerequisite where course_id = ? and and_group = ?";//PREREQUISITES_small_group知道每个先修课组合下面有多少门课程
                 preparedStatement = connection.prepareStatement(PREREQUISITES_small_group_number);
                 preparedStatement.setInt(1, courseId_num);
@@ -1019,34 +950,32 @@ public class StudentServiceIns implements StudentService {
                 preparedStatement.setInt(2, i);
                 ResultSet PREREQUISITES_small_group_result = preparedStatement.executeQuery(); //这个表示查询返回的集合
                 while (PREREQUISITES_small_group_result.next()) {
+                    //这里返回的是pre_id 的集合，现在需要知道sectionid
                     int PREREQUISITES_small_group_pre_id = PREREQUISITES_small_group_result.getInt(1); //得到当前想查询的pre_id是多少
-                    String PREREQUISITES_check_if_pass = "select std_section.section_id,std_section.score,std_section.type from std_section where std_id = ? and section_id = ?";
+                    String PREREQUISITES_check_if_pass = "select score, type\n" +
+                            "from std_section ss\n" +
+                            "         join section s on s.section_id = ss.section_id\n" +
+                            "where std_id = ?\n" +
+                            "  and course_id = ?;";
                     preparedStatement = connection.prepareStatement(PREREQUISITES_check_if_pass);
                     preparedStatement.setInt(1, studentId);
                     preparedStatement.setInt(2, PREREQUISITES_small_group_pre_id);
-                    ResultSet PREREQUISITES_check_if_pass_end = preparedStatement.executeQuery(); //得到返回的结果，section_id 不为空，type不为空，同时成绩及格才能说明先修课满足
-                    while (PREREQUISITES_check_if_pass_end.next()) {
-                        if (PREREQUISITES_check_if_pass_end.getObject(1) != null && PREREQUISITES_check_if_pass_end.getObject(3) != null) {
-                            if (!PREREQUISITES_check_if_pass_end.getBoolean(3)) {//表示通过、不通过
-                                if (PREREQUISITES_check_if_pass_end.getInt(2) == 1) {
-                                    count_paseed_course++;
-                                }
-                            } else {
-                                if (PREREQUISITES_check_if_pass_end.getInt(2) >= 60) {
-                                    count_paseed_course++;
-                                }
-                            }
+                    ResultSet resultSet = preparedStatement.executeQuery(); //得到返回的结果，section_id 不为空，type不为空，同时成绩及格才能说明先修课满足
+                    while (resultSet.next()) {
+                        int score = resultSet.getInt("score");
+                        boolean type = resultSet.getBoolean("type");
+                        if ((type && score >= 60) || (!type && score == 1)) {
+                            count_passed_course++;
                         }
                     }
                 }
-                if (count_paseed_course == should_paseed_course) {
+                if (count_passed_course == should_paseed_course) {
                     if_satisfy_pre++;
                 }
             }
 
             connection.close();
             preparedStatement.close();
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
