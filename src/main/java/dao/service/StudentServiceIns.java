@@ -288,7 +288,7 @@ public class StudentServiceIns implements StudentService {
                     int checkLocation = -1;
                     if (searchInstructor != null) {
                         checkIns = 0; //说明不等于null，接下来决定判断是否成立
-                        if (cls.instructor.fullName.contains(searchInstructor) || cls.instructor.fullName.replace(" ", "").contains(searchInstructor)) {
+                        if (cls.instructor.fullName.replace(" ", "").contains(searchInstructor.replace(" ", ""))) {
                             checkIns = 1;//说明这个条件判断成立
                         }
                     }
@@ -302,7 +302,7 @@ public class StudentServiceIns implements StudentService {
 
                     if (searchClassTime != null) {
                         checkClassTime = 0;
-                        if (cls.classBegin <= searchClassTime && cls.classEnd >= searchClassTime && (searchDayOfWeek == null || searchDayOfWeek.equals(cls.dayOfWeek))) {
+                        if (cls.classBegin <= searchClassTime && cls.classEnd >= searchClassTime) {
                             checkClassTime = 1;
                         }
                     }
@@ -322,7 +322,6 @@ public class StudentServiceIns implements StudentService {
                         tempTest.add(e);
                         break;
                     }
-
                 }
             }
             totalEntries = tempTest;
@@ -435,6 +434,14 @@ public class StudentServiceIns implements StudentService {
             if (ignoreConflict) {
                 totalEntries.removeIf(e -> e.conflictCourseNames.size() != 0);
             }
+
+            totalEntries.sort((o1, o2) -> {
+                if (o1.course.id.compareTo(o2.course.id) == 0) {
+                    return (o1.course.name + "[" + o1.section.name + "]").compareTo(o2.course.name + "[" + o2.section.name + "]");
+                } else {
+                    return o1.course.id.compareTo(o2.course.id);
+                }
+            });
 
             totalEntries = totalEntries.subList(Math.min(pageSize * pageIndex, totalEntries.size()), Math.min((pageIndex + 1) * pageSize, totalEntries.size()));
         } catch (SQLException e) {

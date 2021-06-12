@@ -53,24 +53,24 @@ public final class ProjectJudge {
                     .collect(Collectors.toUnmodifiableList());
             result.elapsedTimeNs.addAndGet(System.nanoTime() - beforeTime);
 
-            /*for (int i = 0; i < searchCourseExpected.size(); i++) {
+            for (int i = 0; i < searchCourseExpected.size(); i++) {
                 if (!searchCourseExpected.get(i).equals(searchCourseResult.get(i))) {
                     List<CourseSearchEntry> expect = searchCourseExpected.get(i);
                     List<CourseSearchEntry> actual = searchCourseResult.get(i);
-                   *//* if (expect.size() != actual.size()) {
+                    if (expect.size() != actual.size()) {
                         System.out.println();
-                    }*//*
-                    for (int j = 0; j < expect.size(); j++) {
-                        if (!expect.get(j).equals(actual.get(j))) {
-                            CourseSearchEntry ex = expect.get(j);
-                            CourseSearchEntry ac = actual.get(j);
-                            System.out.println();
-                        }
                     }
+//                    for (int j = 0; j < expect.size(); j++) {
+//                        if (!expect.get(j).equals(actual.get(j))) {
+//                            CourseSearchEntry ex = expect.get(j);
+//                            CourseSearchEntry ac = actual.get(j);
+//                            System.out.println();
+//                        }
+//                    }
                     testSearchCourse(searchCourseParams.get(i));
-                    System.out.println();
+//                    System.out.println();
                 }
-            }*/
+            }
 
             result.passCount.addAndGet(IntStream.range(0, searchCourseParams.size()).parallel()
                     .filter(it -> searchCourseExpected.get(it).equals(searchCourseResult.get(it))).count());
