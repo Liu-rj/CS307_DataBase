@@ -9,16 +9,25 @@ import cn.edu.sustech.cs307.dto.prerequisite.CoursePrerequisite;
 import cn.edu.sustech.cs307.dto.prerequisite.Prerequisite;
 import cn.edu.sustech.cs307.exception.IntegrityViolationException;
 import cn.edu.sustech.cs307.service.*;
+import com.sun.source.tree.Tree;
 import dao.factory.ServiceFactoryIns;
 
 
 import javax.annotation.Nullable;
+import java.awt.*;
 import java.sql.*;
 import java.sql.Date;
 import java.time.DayOfWeek;
 import java.util.*;
+import java.util.List;
 
 public class StudentServiceIns implements StudentService {
+
+
+
+
+
+
 
     /**
      * The priority of EnrollResult should be (if not SUCCESS):
@@ -94,7 +103,7 @@ public class StudentServiceIns implements StudentService {
     }
 
     @Override
-    public List<CourseSearchEntry> searchCourse(int studentId, int semesterId, @Nullable String searchCid, @Nullable String searchName, @Nullable String searchInstructor, @Nullable DayOfWeek searchDayOfWeek, @Nullable Short searchClassTime, @Nullable List<String> searchClassLocations, CourseType searchCourseType, boolean ignoreFull, boolean ignoreConflict, boolean ignorePassed, boolean ignoreMissingPrerequisites, int pageSize, int pageIndex) {
+    public  List<CourseSearchEntry> searchCourse(int studentId, int semesterId, @Nullable String searchCid, @Nullable String searchName, @Nullable String searchInstructor, @Nullable DayOfWeek searchDayOfWeek, @Nullable Short searchClassTime, @Nullable List<String> searchClassLocations, CourseType searchCourseType, boolean ignoreFull, boolean ignoreConflict, boolean ignorePassed, boolean ignoreMissingPrerequisites, int pageSize, int pageIndex) {
         String selAll = "select *\n" +
                 "from (\n" +
                 "         select s.section_id,\n" +
@@ -144,6 +153,7 @@ public class StudentServiceIns implements StudentService {
         ResultSet resultSet;
         CourseService courseService = new CourseServiceIns();
         try {
+
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
 
             // execute sel
@@ -211,7 +221,7 @@ public class StudentServiceIns implements StudentService {
             if (searchCourseType != CourseType.ALL) {
                 List<CourseSearchEntry> temp = new ArrayList<>();
                 Major major = getStudentMajor(studentId);
-                String sql = "select c.id_code from course_major cm join course c on c.course_id = cm.course_id where major_id = ? and type = ?";
+                String sql = "select c.id_code from course_major cm join course c on c.course_id = cm.course_id where major_id = ? and type = ? order by c.id_code;";
                 preparedStatement = connection.prepareStatement(sql);
 
                 if (searchCourseType == CourseType.MAJOR_COMPULSORY) {
@@ -239,7 +249,7 @@ public class StudentServiceIns implements StudentService {
                         }
                     }
                 } else if (searchCourseType == CourseType.CROSS_MAJOR) {
-                    sql = "select c.id_code from course_major cm join course c on c.course_id = cm.course_id where major_id <> ?";
+                    sql = "select c.id_code from course_major cm join course c on c.course_id = cm.course_id where major_id <> ? order by c.id_code;";
                     preparedStatement = connection.prepareStatement(sql);
                     preparedStatement.setInt(1, major.id);
                     resultSet = preparedStatement.executeQuery();
@@ -254,7 +264,7 @@ public class StudentServiceIns implements StudentService {
                 }
 
                 if (searchCourseType == CourseType.PUBLIC) {
-                    sql = "select c.id_code from course_major cm join course c on c.course_id = cm.course_id";
+                    sql = "select c.id_code from course_major cm join course c on c.course_id = cm.course_id order by c.id_code";
                     preparedStatement = connection.prepareStatement(sql);
                     resultSet = preparedStatement.executeQuery();
                     while (resultSet.next()) {
@@ -265,11 +275,9 @@ public class StudentServiceIns implements StudentService {
                     totalEntries = temp;
                 }
             }
-
             // close connection
             connection.close();
             preparedStatement.close();
-
             // add constraints
             if (searchCid != null) {
                 totalEntries.removeIf(e -> !e.course.id.contains(searchCid));
@@ -337,7 +345,12 @@ public class StudentServiceIns implements StudentService {
             if (ignoreMissingPrerequisites) {
                 totalEntries.removeIf(e -> !passedPrerequisitesForCourse(studentId, e.course.id));
             }
+          /*  for (int i = 0; i < totalEntries.size(); i++) {
+                List<String> conflict = new ArrayList<>();
 
+                totalEntries.get(i).conflictCourseNames = conflict;
+            }*/
+            boolean flag = false;
             for (CourseSearchEntry e : totalEntries) {
                 List<String> conflict = new ArrayList<>();
                 for (CourseSearchEntry target : selected) {
@@ -355,22 +368,33 @@ public class StudentServiceIns implements StudentService {
                                                         || (clsTarget.classBegin >= cls.classBegin && clsTarget.classBegin <= cls.classEnd)
                                                         || (clsTarget.classEnd >= cls.classBegin && clsTarget.classEnd <= cls.classEnd)) {
                                                     conflict.add(target.course.name + '[' + target.section.name + ']');
+                                                    flag = true;
+                                                    break;
                                                 }
                                             }
                                         }
                                     }
+                                    if (flag) {
+                                        break;
+                                    }
                                 }
+                                if (flag) {
+                                    break;
+                                }
+                            }
+                            if (flag) {
+                                break;
                             }
                         }
                     }
+                    flag = false;
                 }
                 e.conflictCourseNames = conflict;
             }
 
             if (ignoreConflict) {
                 totalEntries.removeIf(e -> e.conflictCourseNames.size() != 0);
-            }
-
+        }
 //            totalEntries.sort((o1, o2) -> {
 //                if (o1.course.id.compareTo(o2.course.id) == 0) {
 //                    return (o1.course.name + "[" + o1.section.name + "]").compareTo(o2.course.name + "[" + o2.section.name + "]");
@@ -386,10 +410,13 @@ public class StudentServiceIns implements StudentService {
         return totalEntries;
     }
 
+  /*  @Override
+    public  EnrollResult enrollCourse(int studentId, int sectionId) {
+        return null;
+    }*/
     @Override
-    public synchronized EnrollResult enrollCourse(int studentId, int sectionId) {
+    public EnrollResult enrollCourse(int studentId, int sectionId) {
 
-        String insertStudent = "insert into std_section values(?,?,null,null);";
         //COURSE_NOT_FOUND
         try {
             boolean if_COURSE_NOT_FOUND = check_COURSE_NOT_FOUND(sectionId);
@@ -406,25 +433,7 @@ public class StudentServiceIns implements StudentService {
                 return EnrollResult.ALREADY_PASSED;
             }
 
-            Connection connection = SQLDataSource.getInstance().getSQLConnection();
-            PreparedStatement preparedStatement;
-            ResultSet resultSet;
-
-            String sectionToCourse = "select id_code from section\n" +
-                    "join course c on section.course_id = c.course_id\n" +
-                    "where section_id = ?";
-            preparedStatement = connection.prepareStatement(sectionToCourse);
-            preparedStatement.setInt(1, sectionId);
-            resultSet = preparedStatement.executeQuery();
-            String courseId = "";
-            while (resultSet.next()) {
-                courseId = resultSet.getString(1);
-            }
-            connection.close();
-            preparedStatement.close();
-
-
-            boolean if_PREREQUISITES_NOT_FULFILLED = passedPrerequisitesForCourse(studentId, courseId);
+            boolean if_PREREQUISITES_NOT_FULFILLED = check_PREREQUISITES_NOT_FULFILLED(studentId, sectionId);
             if (!if_PREREQUISITES_NOT_FULFILLED) {
                 return EnrollResult.PREREQUISITES_NOT_FULFILLED;
             }
@@ -439,9 +448,10 @@ public class StudentServiceIns implements StudentService {
                 return EnrollResult.COURSE_IS_FULL;
             }
 
+            String insertStudent = "insert into std_section values(?,?,null,null);";
+
             Connection connection2 = SQLDataSource.getInstance().getSQLConnection();
             PreparedStatement preparedStatement2;
-
 
             preparedStatement2 = connection2.prepareStatement(insertStudent);
             preparedStatement2.setInt(1, studentId);
@@ -449,14 +459,15 @@ public class StudentServiceIns implements StudentService {
             preparedStatement2.execute();
 
             String miniusLeftCapacity = "update section set left_capacity = left_capacity - 1 where section_id = ?;";
+
             preparedStatement2 = connection2.prepareStatement(miniusLeftCapacity);
+
             preparedStatement2.setInt(1, sectionId);
             preparedStatement2.execute();
 
 
             connection2.close();
             preparedStatement2.close();
-
             // close connection
 
         } catch (SQLException e) {
@@ -467,10 +478,11 @@ public class StudentServiceIns implements StudentService {
     }
 
     @Override
-    public void dropCourse(int studentId, int sectionId) throws IllegalStateException {
+    public  void dropCourse(int studentId, int sectionId) throws IllegalStateException {
         //从学生已经选择的课程中删去一门课，如果这门课已经有成绩了，那么不能删除，需要抛出异常
         String check = "select ((select score from std_section where std_id = ? and section_id = ?) is null);";
         String sql = "delete from std_section where std_id = ? and section_id = ? and score is null";
+        String add = "update section set left_capacity = left_capacity + 1 where section_id = ?;";
         PreparedStatement preparedStatement;
         try {
             Connection connection = SQLDataSource.getInstance().getSQLConnection();
@@ -500,6 +512,12 @@ public class StudentServiceIns implements StudentService {
                 preparedStatement2.setInt(2, sectionId);
                 preparedStatement2.execute();
 
+
+                preparedStatement2 = connection2.prepareStatement(add);
+                preparedStatement2.setInt(1, sectionId);
+                preparedStatement2.execute();
+
+
                 connection2.close();
                 preparedStatement2.close();
             }
@@ -513,7 +531,7 @@ public class StudentServiceIns implements StudentService {
     }
 
     @Override
-    public void addEnrolledCourseWithGrade(int studentId, int sectionId, @Nullable Grade grade) {
+    public  void addEnrolledCourseWithGrade(int studentId, int sectionId, @Nullable Grade grade) {
         //绕过先修课，直接给一门课程来进行打分操作
         String sql = "insert into std_section values (?,?,?,?)";
         PreparedStatement preparedStatement;
@@ -563,8 +581,9 @@ public class StudentServiceIns implements StudentService {
 
     }
 
+
     @Override
-    public void setEnrolledCourseGrade(int studentId, int sectionId, Grade grade) {
+    public  void setEnrolledCourseGrade(int studentId, int sectionId, Grade grade) {
         String sql = "insert into std_section values (?,?,?,?)";
         PreparedStatement preparedStatement;
         try {
@@ -608,7 +627,7 @@ public class StudentServiceIns implements StudentService {
     }
 
     @Override
-    public Map<Course, Grade> getEnrolledCoursesAndGrades(int studentId, @Nullable Integer semesterId) {
+    public  Map<Course, Grade> getEnrolledCoursesAndGrades(int studentId, @Nullable Integer semesterId) {
         //查询学生在一个学期内所有课程的乘成绩
 //        Grade a = new HundredMarkGrade((short)1);
 //        Grade b =  PassOrFailGrade.PASS;
@@ -683,7 +702,7 @@ public class StudentServiceIns implements StudentService {
 
 
     @Override
-    public CourseTable getCourseTable(int studentId, Date date) {
+    public  CourseTable getCourseTable(int studentId, Date date) {
         //查询学生在当前周次的课程表
         //需要使用除法来计算出当前的周次
         //首先要获取出来整个的日期范围
@@ -788,7 +807,7 @@ public class StudentServiceIns implements StudentService {
         return courseTableResult;
     }
 
-    public synchronized boolean check_COURSE_NOT_FOUND(int sectionId) {
+    public  boolean check_COURSE_NOT_FOUND(int sectionId) {
         PreparedStatement preparedStatement;
         boolean judge = false;
         try {
@@ -815,7 +834,7 @@ public class StudentServiceIns implements StudentService {
         return judge;     //return EnrollResult.COURSE_NOT_FOUND;
     }
 
-    public synchronized boolean check_COURSE_IS_FULL(int sectionId) {
+    public  boolean check_COURSE_IS_FULL(int sectionId) {
         PreparedStatement preparedStatement;
         boolean judge = false;
         ResultSet resultSet;
@@ -841,7 +860,7 @@ public class StudentServiceIns implements StudentService {
         return judge;     //return EnrollResult.COURSE_IS_FULL;
     }
 
-    public synchronized boolean check_ALREADY_ENROLLED(int studentId, int sectionId) {
+    public  boolean check_ALREADY_ENROLLED(int studentId, int sectionId) {
         PreparedStatement preparedStatement;
         boolean judge = false;
         try {
@@ -869,7 +888,7 @@ public class StudentServiceIns implements StudentService {
     }
 
 
-    public synchronized boolean check_ALREADY_PASSED(int studentId, int sectionId) {
+    public  boolean check_ALREADY_PASSED(int studentId, int sectionId) {
         PreparedStatement preparedStatement;
         boolean judge = false;
         try {
@@ -899,9 +918,105 @@ public class StudentServiceIns implements StudentService {
         return judge;     //false表示这门课并不存在 return EnrollResult.ALREADY_PASSED;
     }
 
+    public  boolean  check_PREREQUISITES_NOT_FULFILLED(int studentId, int sectionId) { //这里的course_id是id_code
+        //需要由这个courseid得到course对应的编号才行
 
+        int courseId_num = 0;
+        String find_courseId_num = "select course_id from course where id_code = ?";
+        PreparedStatement preparedStatement;
+        int if_satisfy_pre = 0;
+        int PREREQUISITES_group_count = 0;
+        try {
+
+
+            Connection connection = SQLDataSource.getInstance().getSQLConnection();
+            ResultSet resultSet1;
+
+            String sectionToCourse = "select id_code from section\n" +
+                    "join course c on section.course_id = c.course_id\n" +
+                    "where section_id = ?";
+
+            preparedStatement = connection.prepareStatement(sectionToCourse);
+            preparedStatement.setInt(1, sectionId);
+            resultSet1 = preparedStatement.executeQuery();
+            String courseId = "";
+            while (resultSet1.next()) {
+                courseId = resultSet1.getString(1);
+            }
+
+            preparedStatement = connection.prepareStatement(find_courseId_num);
+            preparedStatement.setString(1, courseId);
+            ResultSet find_courseId_num_result = preparedStatement.executeQuery();
+            while (find_courseId_num_result.next()) {
+                courseId_num = find_courseId_num_result.getInt(1);
+            }
+
+            //需要有一张专门的表来记录这名学生这门课程的具体选中情况
+            String PREREQUISITES_group = "select count(*)\n" +
+                    "from (\n" +
+                    "         select and_group from prerequisite where course_id = ? group by and_group\n" +
+                    ") a;";
+            //PREREQUISITES_group 知道这门课程有多少个先修课组
+            preparedStatement = connection.prepareStatement(PREREQUISITES_group);
+            preparedStatement.setInt(1, courseId_num);
+            ResultSet PREREQUISITES_group_result = preparedStatement.executeQuery();
+
+            while (PREREQUISITES_group_result.next()) {
+                PREREQUISITES_group_count = PREREQUISITES_group_result.getInt(1);
+            }
+
+
+            for (int i = 1; i <= PREREQUISITES_group_count; i++) {
+                int count_passed_course = 0;//检查每组先修组合下面已经通过的课程数量
+                String PREREQUISITES_small_group_number = "select count(*) from prerequisite where course_id = ? and and_group = ?";//PREREQUISITES_small_group知道每个先修课组合下面有多少门课程
+                preparedStatement = connection.prepareStatement(PREREQUISITES_small_group_number);
+                preparedStatement.setInt(1, courseId_num);
+                preparedStatement.setInt(2, i);
+                ResultSet PREREQUISITES_small_group_number_result = preparedStatement.executeQuery(); //这个表示查询返回的集合
+                int should_paseed_course = 0;
+                while (PREREQUISITES_small_group_number_result.next()) {
+                    should_paseed_course = PREREQUISITES_small_group_number_result.getInt(1);
+                }
+                String PREREQUISITES_small_group = "select pre_id from prerequisite where course_id = ? and and_group = ?";//PREREQUISITES_small_group知道每个先修课组合下面有多少门课程
+                preparedStatement = connection.prepareStatement(PREREQUISITES_small_group);
+                preparedStatement.setInt(1, courseId_num);
+                preparedStatement.setInt(2, i);
+                ResultSet PREREQUISITES_small_group_result = preparedStatement.executeQuery(); //这个表示查询返回的集合
+                while (PREREQUISITES_small_group_result.next()) {
+                    //这里返回的是pre_id 的集合，现在需要知道sectionid
+                    int PREREQUISITES_small_group_pre_id = PREREQUISITES_small_group_result.getInt(1); //得到当前想查询的pre_id是多少
+                    String PREREQUISITES_check_if_pass = "select score, type\n" +
+                            "from std_section ss\n" +
+                            "         join section s on s.section_id = ss.section_id\n" +
+                            "where std_id = ?\n" +
+                            "  and course_id = ?;";
+                    preparedStatement = connection.prepareStatement(PREREQUISITES_check_if_pass);
+                    preparedStatement.setInt(1, studentId);
+                    preparedStatement.setInt(2, PREREQUISITES_small_group_pre_id);
+                    ResultSet resultSet = preparedStatement.executeQuery(); //得到返回的结果，section_id 不为空，type不为空，同时成绩及格才能说明先修课满足
+                    while (resultSet.next()) {
+                        int score = resultSet.getInt("score");
+                        boolean type = resultSet.getBoolean("type");
+                        if ((type && score >= 60) || (!type && score == 1)) {
+                            count_passed_course++;
+                        }
+                    }
+                }
+                if (count_passed_course == should_paseed_course) {
+                    if_satisfy_pre++;
+                }
+            }
+
+            connection.close();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        //等于0说明循环下来没有满足先修关系的课程
+        return if_satisfy_pre != 0 || PREREQUISITES_group_count == 0;
+    }
     @Override
-    public synchronized boolean passedPrerequisitesForCourse(int studentId, String courseId) { //这里的course_id是id_code
+    public  boolean passedPrerequisitesForCourse(int studentId, String courseId) { //这里的course_id是id_code
         //需要由这个courseid得到course对应的编号才行
         int courseId_num = 0;
         String find_courseId_num = "select course_id from course where id_code = ?";
@@ -983,7 +1098,7 @@ public class StudentServiceIns implements StudentService {
         return if_satisfy_pre != 0 || PREREQUISITES_group_count == 0;
     }
 
-    public synchronized boolean check_COURSE_CONFLICT_FOUND(int studentId, int sectionId) {
+    public  boolean check_COURSE_CONFLICT_FOUND(int studentId, int sectionId) {
         String selSelected = "select s.section_id,\n" +
                 "       c.course_id,\n" +
                 "       s2.name                           as section,\n" +
@@ -1082,7 +1197,7 @@ public class StudentServiceIns implements StudentService {
     }
 
     @Override
-    public Major getStudentMajor(int studentId) {
+    public  Major getStudentMajor(int studentId) {
         String getMajor = "select s.major_id, name, department_id\n" +
                 "from student s\n" +
                 "         join major m on s.major_id = m.major_id\n" +

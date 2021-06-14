@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-
 public final class ProjectJudge {
     private static final File searchCourse1Dir = new File("./data/searchCourse1/");
     private static final File enrollCourse1Dir = new File("./data/enrollCourse1/");
@@ -52,7 +51,6 @@ public final class ProjectJudge {
                     .mapToObj(it -> testSearchCourse(searchCourseParams.get(it)))
                     .collect(Collectors.toUnmodifiableList());
             result.elapsedTimeNs.addAndGet(System.nanoTime() - beforeTime);
-
             result.passCount.addAndGet(IntStream.range(0, searchCourseParams.size()).parallel()
                     .filter(it -> searchCourseExpected.get(it).equals(searchCourseResult.get(it))).count());
         }
@@ -142,21 +140,6 @@ public final class ProjectJudge {
                     .mapToObj(it -> testCourseTable(courseTableParams.get(it)))
                     .collect(Collectors.toUnmodifiableList());
             result.elapsedTimeNs.addAndGet(System.nanoTime() - beforeTime);
-
-     /*       for (int i = 0; i < courseTableExpected.size(); i++) {
-                if (!courseTableExpected.get(i).equals(courseTableResults.get(i))) {
-                    CourseTable expect = courseTableExpected.get(i);
-                    CourseTable actual = courseTableResults.get(i);
-                    for (int j = 0; j < 7; j++) {
-                        Set<CourseTable.CourseTableEntry> ex = expect.table.get(DayOfWeek.of(j + 1));
-                        Set<CourseTable.CourseTableEntry> ac = actual.table.get(DayOfWeek.of(j + 1));
-                        if (!ex.equals(ac)) {
-                            System.out.println();
-                        }
-                    }
-                }
-            }
-*/
             result.passCount.addAndGet(IntStream.range(0, courseTableParams.size()).parallel()
                     .filter(it -> courseTableExpected.get(it).equals(courseTableResults.get(it))).count());
         }
@@ -286,10 +269,7 @@ public final class ProjectJudge {
         // 9. Test enrollCourse2
         EnrollEvalResult enrollCourse2 = testEnrollCourses(enrollCourse2Dir);
         System.out.println("Test enroll course 2: " + enrollCourse2.passCount.get());
-        System.out.printf("Test enroll course 2 time: %.2fs\n", courseTables2.elapsedTimeNs.get() / 1000000000.0);
-
-        // TODO: Multi-threaded benchmark
-
+        System.out.printf("Test enroll course 2 time: %.2fs\n", enrollCourse2.elapsedTimeNs.get() / 1000000000.0);
     }
 
     public static void main(String[] args) {
